@@ -20,7 +20,7 @@ USE_STATUS_INFO = True
 USE_OPPONENT_REVEALED = True
 USE_TURN_INFO = True
 USE_INTERACTION_FEATURES = True
-USE_DERIVED_FEATURES = True
+USE_DERIVED_FEATURES = False
 N_ESTIMATORS = 2000
 MAX_DEPTH = 50
 MIN_SAMPLES_SPLIT = 2
@@ -42,135 +42,43 @@ def load_data(file_path):
     print(f"Loading data from {file_path}...")
     return pd.read_parquet(file_path)
 
-def create_derived_features(df):
-    print("Creating derived features...")
-    df_with_features = df.copy()
-    df_with_features['matchup'] = df_with_features['p1_pokemon'] + '_vs_' + df_with_features['p2_pokemon']
-    df_with_features['rating_diff'] = df_with_features['p1_rating'] - df_with_features['p2_rating']
-    df_with_features['rating_advantage'] = (df_with_features['rating_diff'] > 0).astype(int)
-
-    def get_game_stage(turn_id):
-        if turn_id <= 2:
-            return 'early'
-        elif turn_id <= 10:
-            return 'mid'
-        else:
-            return 'late'
-    df_with_features['game_stage'] = df_with_features['turn_id'].apply(get_game_stage)
-
-    top_pokemon = ['Skarmory', 'Blissey', 'Tyranitar', 'Swampert', 'Gengar',
-                   'Metagross', 'Salamence', 'Celebi', 'Zapdos', 'Magneton']
-    for pokemon in top_pokemon:
-        df_with_features[f'p1_revealed_{pokemon}'] = (df_with_features['p1_revealed_pokemon'] == pokemon).astype(int)
-        df_with_features[f'p2_has_{pokemon}'] = (df_with_features['p2_pokemon'] == pokemon).astype(int)
-
-    status_types = ['par', 'tox', 'slp', 'brn', 'frz', 'psn']
-    for status in status_types:
-        df_with_features[f'p1_status_{status}'] = (df_with_features['p1_status'] == status).astype(int)
-        df_with_features[f'p2_status_{status}'] = (df_with_features['p2_status'] == status).astype(int)
-
-    df_with_features['p1_has_status_effect'] = (~df_with_features['p1_status'].isna()).astype(int)
-    df_with_features['p2_has_status_effect'] = (~df_with_features['p2_status'].isna()).astype(int)
-
-    p1_damage = df_with_features['p1_damage_taken'].fillna(0)
-    p2_damage = df_with_features['p2_damage_taken'].fillna(0)
-    df_with_features['damage_diff'] = p2_damage - p1_damage
-    df_with_features['p1_advantage'] = (df_with_features['damage_diff'] > 0).astype(int)
-    df_with_features['equal_damage'] = (df_with_features['damage_diff'] == 0).astype(int)
-
-    setup_moves = ['Swords Dance', 'Dragon Dance', 'Calm Mind', 'Agility', 'Bulk Up', 'Curse']
-    status_moves = ['Thunder Wave', 'Toxic', 'Will-O-Wisp', 'Hypnosis', 'Spore', 'Stun Spore']
-    defensive_moves = ['Protect', 'Substitute', 'Recover', 'Rest', 'Wish', 'Reflect', 'Light Screen']
-    df_with_features['p1_used_setup'] = df_with_features['p1_move'].isin(setup_moves).astype(int)
-    df_with_features['p1_used_status'] = df_with_features['p1_move'].isin(status_moves).astype(int)
-    df_with_features['p1_used_defensive'] = df_with_features['p1_move'].isin(defensive_moves).astype(int)
-    df_with_features['p2_used_setup'] = df_with_features['p2_move'].isin(setup_moves).astype(int)
-    df_with_features['p2_used_status'] = df_with_features['p2_move'].isin(status_moves).astype(int)
-    df_with_features['p2_used_defensive'] = df_with_features['p2_move'].isin(defensive_moves).astype(int)
-
-    df_with_features['battle_state'] = df_with_features['game_stage'] + '_' + \
-                                       df_with_features['p1_advantage'].astype(str) + '_' + \
-                                       df_with_features['p1_has_status_effect'].astype(str)
-
-    df_with_features['has_revealed_defensive_pokemon'] = df_with_features['p2_revealed_pokemon'].isin(
-        ['Skarmory', 'Blissey', 'Snorlax', 'Umbreon', 'Suicune']).astype(int)
-    df_with_features['has_revealed_offensive_pokemon'] = df_with_features['p2_revealed_pokemon'].isin(
-        ['Tyranitar', 'Salamence', 'Metagross', 'Gengar', 'Zapdos', 'Swampert']).astype(int)
-
-    df_with_features['turn_squared'] = df_with_features['turn_id'] ** 2
-    df_with_features['turn_log'] = np.log1p(df_with_features['turn_id'])
-
-    df_with_features['rating_sum'] = df_with_features['p1_rating'] + df_with_features['p2_rating']
-    df_with_features['rating_product'] = df_with_features['p1_rating'] * df_with_features['p2_rating']
-    return df_with_features
-
 def preprocess_data(df, target_column):
     print("Preprocessing data...")
     processed_df = df.copy()
 
-    if USE_DERIVED_FEATURES:
-        processed_df = create_derived_features(processed_df)
-
     features = []
-
     if USE_RATING_FEATURES:
         features.extend(['p1_rating', 'p2_rating'])
-        if USE_DERIVED_FEATURES:
-            features.extend(['rating_diff', 'rating_advantage', 'rating_sum', 'rating_product'])
 
     if USE_CURRENT_POKEMON:
         features.extend(['p1_pokemon', 'p2_pokemon'])
-        if USE_DERIVED_FEATURES:
-            features.extend(['matchup'])
-            for pokemon in ['Skarmory', 'Blissey', 'Tyranitar', 'Swampert', 'Gengar',
-                            'Metagross', 'Salamence', 'Celebi', 'Zapdos', 'Magneton']:
-                features.extend([f'p1_revealed_{pokemon}', f'p2_has_{pokemon}'])
 
     if USE_MOVES:
         features.extend(['p1_move', 'p2_move'])
-        if USE_DERIVED_FEATURES:
-            features.extend([
-                'p1_used_setup', 'p1_used_status', 'p1_used_defensive',
-                'p2_used_setup', 'p2_used_status', 'p2_used_defensive'
-            ])
 
     if USE_DAMAGE_INFO:
         features.extend(['p1_damage_taken', 'p2_damage_taken'])
-        if USE_DERIVED_FEATURES:
-            features.extend(['damage_diff', 'p1_advantage', 'equal_damage'])
 
     if USE_STATUS_INFO:
         features.extend(['p1_status', 'p2_status'])
-        if USE_DERIVED_FEATURES:
-            status_types = ['par', 'tox', 'slp', 'brn', 'frz', 'psn']
-            for status in status_types:
-                features.extend([f'p1_status_{status}', f'p2_status_{status}'])
-            features.extend(['p1_has_status_effect', 'p2_has_status_effect'])
 
     if USE_OPPONENT_REVEALED:
         features.extend(['p1_revealed_pokemon'])
-        if USE_DERIVED_FEATURES:
-            features.extend(['has_revealed_defensive_pokemon', 'has_revealed_offensive_pokemon'])
 
     if USE_TURN_INFO:
         features.extend(['turn_id'])
-        if USE_DERIVED_FEATURES:
-            features.extend(['game_stage', 'turn_squared', 'turn_log'])
-
-    if USE_DERIVED_FEATURES and USE_DAMAGE_INFO and USE_STATUS_INFO and USE_TURN_INFO:
-        features.extend(['battle_state'])
 
     processed_df = processed_df.dropna(subset=[target_column])
 
     categorical_features = []
     numerical_features = []
+
     for feature in features:
         if feature in processed_df.columns:
             if (processed_df[feature].dtype == 'object' or
                     feature in [
                         'p1_pokemon', 'p2_pokemon', 'p1_move', 'p2_move',
-                        'p1_status', 'p2_status', 'p1_revealed_pokemon', 'matchup',
-                        'game_stage', 'battle_state'
+                        'p1_status', 'p2_status', 'p1_revealed_pokemon'
                     ]):
                 categorical_features.append(feature)
             else:
@@ -195,6 +103,7 @@ def preprocess_data(df, target_column):
 
     feature_mapping = {}
     cat_start_idx = 0
+
     for i, cat_feature in enumerate(categorical_features):
         unique_values = X[cat_feature].unique()
         feature_mapping[cat_feature] = {
@@ -210,6 +119,7 @@ def preprocess_data(df, target_column):
             'type': 'numerical',
             'index': cat_start_idx + i
         }
+
     return X, y, categorical_features, numerical_features, processed_df, feature_mapping
 
 class CustomOneHotEncoder:
@@ -222,17 +132,20 @@ class CustomOneHotEncoder:
         self.encoders = {}
         self.feature_names = []
         self.n_features = 0
+
         for feature in categorical_features:
             unique_values = X[feature].unique()
             self.encoders[feature] = {value: i for i, value in enumerate(unique_values)}
             for value in unique_values:
                 self.feature_names.append(f"{feature}_{value}")
             self.n_features += len(unique_values)
+
         return self
 
     def transform(self, X, categorical_features):
         n_samples = X.shape[0]
         encoded = np.zeros((n_samples, self.n_features))
+
         current_idx = 0
         for feature in categorical_features:
             encoder = self.encoders[feature]
@@ -240,6 +153,7 @@ class CustomOneHotEncoder:
                 if value in encoder:
                     encoded[i, current_idx + encoder[value]] = 1
             current_idx += len(encoder)
+
         return encoded
 
     def get_feature_names(self):
@@ -250,6 +164,7 @@ def train_model_with_tracking(X, y, categorical_features, numerical_features, fe
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y
     )
+
     print(f"Training data shape: {X_train.shape}")
     print(f"Testing data shape: {X_test.shape}")
 
@@ -272,7 +187,6 @@ def train_model_with_tracking(X, y, categorical_features, numerical_features, fe
 
     print(f"Creating and training random forest with {N_ESTIMATORS} trees...")
     print("This will take a while...")
-
     start_time = time.time()
 
     model = RandomForestClassifier(
@@ -297,7 +211,6 @@ def train_model_with_tracking(X, y, categorical_features, numerical_features, fe
         print(f"Training trees {i+1} to {batch_end}...")
         model.n_estimators = batch_end
         model.fit(X_train_combined, y_train)
-
         elapsed_time = time.time() - start_time
         print(f"  Trained {batch_end} trees in {elapsed_time:.2f} seconds.")
         if OOB_SCORE:
@@ -324,24 +237,22 @@ def train_model_with_tracking(X, y, categorical_features, numerical_features, fe
         'X_train_combined': X_train_combined,
         'X_test_combined': X_test_combined
     }
+
     return model_info
 
 def show_interpretable_feature_importance(model_info):
     print("\nFeature Importance Analysis:")
-
     model = model_info['model']
     feature_names = model_info['feature_names']
     feature_mapping = model_info['feature_mapping']
 
     importances = model.feature_importances_
-
     importance_df = pd.DataFrame({
         'Feature': feature_names,
         'Importance': importances
     })
 
     importance_df = importance_df.sort_values('Importance', ascending=False).reset_index(drop=True)
-
     importance_df['Base_Feature'] = importance_df['Feature'].apply(
         lambda x: x.split('_')[0] if '_' in x else x
     )
@@ -380,23 +291,8 @@ def show_interpretable_feature_importance(model_info):
     except Exception as e:
         print(f"Could not create individual feature importance plot: {e}")
 
-    print("\nPokemon-Specific Feature Importance:")
-
-    top_pokemon = [
-        'Skarmory', 'Blissey', 'Tyranitar', 'Swampert', 'Gengar',
-        'Metagross', 'Salamence', 'Celebi', 'Zapdos', 'Magneton'
-    ]
-    for pokemon in top_pokemon:
-        pokemon_features = importance_df[importance_df['Feature'].str.contains(pokemon)]
-        if not pokemon_features.empty:
-            total_importance = pokemon_features['Importance'].sum()
-            print(f"\n{pokemon} total importance: {total_importance:.4f}")
-            for i, row in pokemon_features.iterrows():
-                print(f"  {row['Feature']}: {row['Importance']:.4f}")
-
 def evaluate_model(model_info):
     print("\nModel Evaluation:")
-
     model = model_info['model']
     X_test_combined = model_info['X_test_combined']
     y_test = model_info['y_test']
@@ -421,7 +317,6 @@ def evaluate_model(model_info):
         y_test, y_pred,
         labels=top5_classes
     )
-
     cm_df = pd.DataFrame(cm, index=top5_classes, columns=top5_classes)
     print(cm_df)
 
@@ -442,7 +337,6 @@ def evaluate_model(model_info):
         show_interpretable_feature_importance(model_info)
 
     print("\nError Analysis:")
-
     X_test_reset = model_info['X_test'].reset_index(drop=True)
     error_df = pd.DataFrame({
         'Actual': y_test.reset_index(drop=True),
@@ -460,6 +354,7 @@ def evaluate_model(model_info):
         'Actual': 'count'
     }).rename(columns={'Correct': 'Accuracy', 'Actual': 'Count'})
     by_pokemon = by_pokemon.sort_values('Count', ascending=False).head(10)
+
     print("\nAccuracy by Current Opponent Pokemon (top 10 by frequency):")
     print(by_pokemon)
 
@@ -472,6 +367,7 @@ def evaluate_model(model_info):
             4: 'Turn 6-10',
             5: 'Turn 11+'
         }
+
         def map_turn(turn):
             if turn <= 2:
                 return turn
@@ -481,12 +377,15 @@ def evaluate_model(model_info):
                 return 4
             else:
                 return 5
+
         error_df['turn_group'] = error_df['turn_id'].apply(map_turn)
         error_df['turn_label'] = error_df['turn_group'].map(turn_mapping)
+
         by_turn = error_df.groupby('turn_label').agg({
             'Correct': 'mean',
             'Actual': 'count'
         }).rename(columns={'Correct': 'Accuracy', 'Actual': 'Count'})
+
         print("\nAccuracy by Game Stage:")
         print(by_turn)
 
@@ -502,10 +401,10 @@ def get_prediction_probabilities(model_info, sample_data, top_n=5):
 
     proba = model.predict_proba(sample_combined)[0]
     classes = model.classes_
-
     sorted_indices = np.argsort(proba)[::-1][:top_n]
     top_classes = classes[sorted_indices]
     top_probas = proba[sorted_indices]
+
     return top_classes, top_probas
 
 def save_model_package(model_info, filename="pokemon_prediction_model_package.joblib"):
@@ -519,23 +418,19 @@ def save_model_package(model_info, filename="pokemon_prediction_model_package.jo
         'numerical_features': model_info['numerical_features'],
         'feature_mapping': model_info['feature_mapping']
     }
+
     joblib.dump(model_package, filename)
     print(f"Model package saved to '{filename}'")
 
 def main():
     df = load_data(FILE_PATH)
-
     X, y, categorical_features, numerical_features, processed_df, feature_mapping = preprocess_data(df, TARGET_COLUMN)
-
     model_info = train_model_with_tracking(X, y, categorical_features, numerical_features, feature_mapping)
-
     evaluate_model(model_info)
 
     print("\nSample Prediction with Probabilities:")
-
     sample_idx = np.random.randint(0, len(model_info['X_test']))
     sample_data = model_info['X_test'].iloc[sample_idx:sample_idx+1]
-
     actual_pokemon = model_info['y_test'].iloc[sample_idx]
 
     top_predictions, top_probabilities = get_prediction_probabilities(model_info, sample_data, top_n=5)
@@ -543,12 +438,13 @@ def main():
     print(f"Sample input features:")
     for col in sample_data.columns:
         print(f"  {col}: {sample_data[col].values[0]}")
+
     print(f"Actual next Pokémon: {actual_pokemon}")
     print(f"Top 5 predictions:")
     for i, (pokemon, prob) in enumerate(zip(top_predictions, top_probabilities)):
         print(f"  {i+1}. {pokemon}: {prob:.4f} probability")
 
-    save_model_package(model_info)
+    #save_model_package(model_info)
 
 if __name__ == "__main__":
     main()
