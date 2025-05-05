@@ -166,7 +166,7 @@ def generate_parquet_rows(game_id, refined):
                 seen_p1.add(active["p1"])
             if active["p2"]:
                 seen_p2.add(active["p2"])
-            num_turns += 1
+
             cutoff_p1 = list(seen_p1)[1:] if IGNORE_LEAD and len(seen_p1) > 0 else list(seen_p1)
             cutoff_p2 = list(seen_p2)[1:] if IGNORE_LEAD and len(seen_p2) > 0 else list(seen_p2)
 
@@ -178,6 +178,8 @@ def generate_parquet_rows(game_id, refined):
                 break
             elif REVEAL_MODE == "either" and (len(cutoff_p1) >= REVEAL_LIMIT or len(cutoff_p2) >= REVEAL_LIMIT):
                 break
+
+            num_turns += 1
     else:
         num_turns = min(TURN_LIMIT, len(refined["turns"]))
 
