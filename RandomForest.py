@@ -161,9 +161,21 @@ class CustomOneHotEncoder:
 
 def train_model_with_tracking(X, y, categorical_features, numerical_features, feature_mapping):
     print("Splitting data into train and test sets...")
+
+    class_counts = y.value_counts()
+
+    rare_classes = class_counts[class_counts < 2].index
+    if len(rare_classes) > 0:
+        print(f"Removing {len(rare_classes)} rare Pokemon classes with only 1 occurrence")
+        keep_mask = ~y.isin(rare_classes)
+        X = X[keep_mask]
+        y = y[keep_mask]
+        print(f"Data shape after removing rare classes: {X.shape}")
+
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y
     )
+
 
     print(f"Training data shape: {X_train.shape}")
     print(f"Testing data shape: {X_test.shape}")
