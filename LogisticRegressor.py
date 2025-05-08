@@ -7,7 +7,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 
 
-df = pd.read_parquet("parsed_showdown_replays.parquet")
+df = pd.read_parquet("Parquets/parsed_showdown_replays.parquet")
 
 X = df.drop(['game_id', 'p1_revealed_pokemon', 'p2_revealed_pokemon'], axis=1)
 y = df.p1_revealed_pokemon

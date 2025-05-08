@@ -3,7 +3,7 @@ import re
 import pandas as pd
 from bs4 import BeautifulSoup
 
-REPLAY_DIR = "Replays"
+REPLAY_DIR = "../Replays"
 OUTPUT_PARQUET = "parsed_showdown_replays.parquet"
 REVEAL_LIMIT = 1  # Set how many revealed Pokémon to include per team
 IGNORE_LEAD = True  # If True, exclude the first revealed Pokémon (the lead)

@@ -130,7 +130,7 @@ def analyze_parquet_file(file_path):
         return {"error": str(e)}
 
 def main():
-    file_path = Path("parsed_showdown_replays.parquet")
+    file_path = Path("../Parquets/parsed_showdown_replays.parquet")
 
     if not file_path.exists():
         print(f"Error: File {file_path} does not exist!")

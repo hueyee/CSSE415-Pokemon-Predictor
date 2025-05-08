@@ -10,7 +10,7 @@ import time
 import warnings
 warnings.filterwarnings('ignore')
 
-FILE_PATH = "parsed_showdown_replays.parquet"
+FILE_PATH = "../Parquets/parsed_showdown_replays.parquet"
 TARGET_COLUMN = 'p2_revealed_pokemon'
 USE_RATING_FEATURES = True
 USE_CURRENT_POKEMON = True
@@ -256,7 +256,6 @@ def show_interpretable_feature_importance(model_info):
     print("\nFeature Importance Analysis:")
     model = model_info['model']
     feature_names = model_info['feature_names']
-    feature_mapping = model_info['feature_mapping']
 
     importances = model.feature_importances_
     importance_df = pd.DataFrame({
