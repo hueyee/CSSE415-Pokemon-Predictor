@@ -37,7 +37,7 @@ def parse_replay_data(battle_log):
         elif line.startswith("|turn|"):
             if current_turn:
                 turns.append(current_turn)
-            current_turn = []
+            current_turn = [line]
         elif line:
             current_turn.append(line)
 
@@ -63,11 +63,12 @@ def extract_features(turns):
                     continue
 
                 parts = event.split('|')
-                if len(parts) > 2 and parts[1] == 'switch':
+                if len(parts) > 2 and parts[1] in ['switch', 'drag']:
                     player_pokemon = parts[2]
-                    nickname = player_pokemon.split(': ')[1]
-                    canonical_name = parts[3].split(',')[0]
-                    nickname_mapping[nickname] = canonical_name
+                    if ': ' in player_pokemon:
+                        nickname = player_pokemon.split(': ')[1]
+                        canonical_name = parts[3].split(',')[0]
+                        nickname_mapping[nickname] = canonical_name
 
                 updated_event = event
                 for nickname, canonical_name in nickname_mapping.items():
@@ -80,7 +81,6 @@ def refine_features(features):
     refined_features = {
         "player_ratings": None,
         "turns": [],
-        "revealed_pokemon": {"p1": [], "p2": []}
     }
 
     current_pokemon = {"p1": None, "p2": None}
@@ -88,6 +88,8 @@ def refine_features(features):
         "p1": [None, None, None, None, None],
         "p2": [None, None, None, None, None]
     }
+    revealed_pokemon = {"p1": set(), "p2": set()}
+    fainted_pokemon = {"p1": set(), "p2": set()}
 
     for feature in features:
         if "player_ratings" in feature:
@@ -100,61 +102,70 @@ def refine_features(features):
                     "p2": previous_pokemon["p2"].copy()
                 },
                 "num_revealed": {
-                    "p1": len(refined_features["revealed_pokemon"]["p1"]),
-                    "p2": len(refined_features["revealed_pokemon"]["p2"])
+                    "p1": len(revealed_pokemon["p1"]),
+                    "p2": len(revealed_pokemon["p2"])
                 },
                 "moves_used": [],
                 "damage": [],
-                "statuses": []
+                "statuses": [],
+                "fainted": []
             }
 
             for event in feature["turn_events"]:
                 parts = event.split('|')
 
-                if len(parts) > 2 and parts[1] == "switch":
+                if len(parts) > 2 and parts[1] in ["switch", "drag"]:
                     player = parts[2].split(':')[0]
                     pokemon = parts[3].split(',')[0]
 
                     if "p1" in player:
-                        if current_pokemon["p1"] is not None and current_pokemon["p1"] != pokemon:
+                        if current_pokemon["p1"] != pokemon and current_pokemon["p1"] is not None:
                             previous_pokemon["p1"] = [current_pokemon["p1"]] + previous_pokemon["p1"][:-1]
-
                         current_pokemon["p1"] = pokemon
-                        if pokemon not in refined_features["revealed_pokemon"]["p1"]:
-                            refined_features["revealed_pokemon"]["p1"].append(pokemon)
-
+                        revealed_pokemon["p1"].add(pokemon)
                     elif "p2" in player:
-                        if current_pokemon["p2"] is not None and current_pokemon["p2"] != pokemon:
+                        if current_pokemon["p2"] != pokemon and current_pokemon["p2"] is not None:
                             previous_pokemon["p2"] = [current_pokemon["p2"]] + previous_pokemon["p2"][:-1]
-
                         current_pokemon["p2"] = pokemon
-                        if pokemon not in refined_features["revealed_pokemon"]["p2"]:
-                            refined_features["revealed_pokemon"]["p2"].append(pokemon)
+                        revealed_pokemon["p2"].add(pokemon)
 
                 elif len(parts) > 2 and parts[1] == "move":
-                    pokemon = parts[2].split(': ')[1]
+                    pokemon = parts[2].split(': ')[1] if ': ' in parts[2] else None
                     move = parts[3]
-                    turn_summary["moves_used"].append({"pokemon": pokemon, "move": move})
+                    if pokemon:
+                        turn_summary["moves_used"].append({"pokemon": pokemon, "move": move})
 
                 elif len(parts) > 2 and parts[1] == "-damage":
-                    target = parts[2].split(': ')[1]
-                    raw_hp = parts[3].split()[0]
-                    if raw_hp == "0":
-                        hp_val = 0.0
-                    elif "/" in raw_hp:
-                        try:
-                            current, total = map(int, raw_hp.split("/")[0:2])
-                            hp_val = round(current / total, 4)
-                        except:
+                    target = parts[2].split(': ')[1] if ': ' in parts[2] else None
+                    if target:
+                        raw_hp = parts[3].split()[0]
+                        if raw_hp == "0":
+                            hp_val = 0.0
+                        elif "/" in raw_hp:
+                            try:
+                                current, total = map(int, raw_hp.split("/")[0:2])
+                                hp_val = round(current / total, 4)
+                            except:
+                                hp_val = None
+                        else:
                             hp_val = None
-                    else:
-                        hp_val = None
-                    turn_summary["damage"].append({"target": target, "hp": hp_val})
+                        turn_summary["damage"].append({"target": target, "hp": hp_val})
 
                 elif len(parts) > 2 and parts[1] == "-status":
-                    target = parts[2].split(': ')[1]
+                    target = parts[2].split(': ')[1] if ': ' in parts[2] else None
                     status = parts[3]
-                    turn_summary["statuses"].append({"target": target, "status": status})
+                    if target:
+                        turn_summary["statuses"].append({"target": target, "status": status})
+
+                elif len(parts) > 2 and parts[1] == "faint":
+                    pokemon_info = parts[2]
+                    if ': ' in pokemon_info:
+                        player, pokemon = pokemon_info.split(': ')[0], pokemon_info.split(': ')[1]
+                        turn_summary["fainted"].append({"player": player, "pokemon": pokemon})
+                        if "p1" in player:
+                            fainted_pokemon["p1"].add(pokemon)
+                        elif "p2" in player:
+                            fainted_pokemon["p2"].add(pokemon)
 
             turn_summary["active_pokemon"] = current_pokemon.copy()
             turn_summary["previous_pokemon"] = {
@@ -162,8 +173,12 @@ def refine_features(features):
                 "p2": previous_pokemon["p2"].copy()
             }
             turn_summary["num_revealed"] = {
-                "p1": len(refined_features["revealed_pokemon"]["p1"]),
-                "p2": len(refined_features["revealed_pokemon"]["p2"])
+                "p1": len(revealed_pokemon["p1"]),
+                "p2": len(revealed_pokemon["p2"])
+            }
+            turn_summary["fainted_pokemon"] = {
+                "p1": list(fainted_pokemon["p1"]),
+                "p2": list(fainted_pokemon["p2"])
             }
 
             refined_features["turns"].append(turn_summary)
@@ -189,6 +204,9 @@ def generate_parquet_rows(game_id, refined):
 
         p1_num_revealed = turn["num_revealed"]["p1"]
         p2_num_revealed = turn["num_revealed"]["p2"]
+
+        p1_fainted = ",".join(turn["fainted_pokemon"]["p1"]) if turn["fainted_pokemon"]["p1"] else None
+        p2_fainted = ",".join(turn["fainted_pokemon"]["p2"]) if turn["fainted_pokemon"]["p2"] else None
 
         p1_move = next((m["move"] for m in turn["moves_used"] if m["pokemon"] == p1_pokemon), None)
         p2_move = next((m["move"] for m in turn["moves_used"] if m["pokemon"] == p2_pokemon), None)
@@ -223,6 +241,9 @@ def generate_parquet_rows(game_id, refined):
             "p1_number_of_pokemon_revealed": p1_num_revealed,
             "p2_number_of_pokemon_revealed": p2_num_revealed,
 
+            "p1_fainted_pokemon": p1_fainted,
+            "p2_fainted_pokemon": p2_fainted,
+
             "p1_move": p1_move,
             "p2_move": p2_move,
             "p1_damage_taken": p1_damage,
@@ -235,12 +256,15 @@ def generate_parquet_rows(game_id, refined):
 
 def main():
     all_rows = []
+    processed_files = 0
+
     for fname in os.listdir(REPLAY_DIR):
         if not fname.endswith(".html"):
             continue
         match = re.match(r"gen3ou-(.+?)\.html", fname)
         if not match:
             continue
+
         game_id = match.group(1)
         try:
             log = extract_battle_log_from_html(os.path.join(REPLAY_DIR, fname))
@@ -248,10 +272,14 @@ def main():
             features = extract_features(turns)
             refined = refine_features(features)
             all_rows.extend(generate_parquet_rows(game_id, refined))
+            processed_files += 1
+            if processed_files % 10 == 0:
+                print(f"Processed {processed_files} files...")
         except Exception as e:
             print(f"Failed to process {fname}: {e}")
 
     df = pd.DataFrame(all_rows)
+    os.makedirs(os.path.dirname(OUTPUT_PARQUET), exist_ok=True)
     df.to_parquet(OUTPUT_PARQUET, index=False)
     print(f"Saved {len(df)} rows to {OUTPUT_PARQUET}")
 

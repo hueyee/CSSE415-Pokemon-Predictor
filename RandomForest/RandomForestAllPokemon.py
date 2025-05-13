@@ -10,17 +10,17 @@ import time
 import warnings
 warnings.filterwarnings('ignore')
 
-FILE_PATH = "../Parquets/parsed_showdown_replays.parquet"
-TARGET_COLUMN = 'p2_revealed_pokemon'
+FILE_PATH = "../Parquets/all_pokemon_showdown_replays.parquet"
+TARGET_COLUMN = 'p2_current_pokemon'
 USE_RATING_FEATURES = True
 USE_CURRENT_POKEMON = True
+USE_PREVIOUS_POKEMON = True
+USE_POKEMON_COUNT = True
+USE_FAINTED_POKEMON = True
 USE_MOVES = True
 USE_DAMAGE_INFO = True
 USE_STATUS_INFO = True
-USE_OPPONENT_REVEALED = True
 USE_TURN_INFO = True
-USE_INTERACTION_FEATURES = True
-USE_DERIVED_FEATURES = False
 N_ESTIMATORS = 2000
 MAX_DEPTH = 50
 MIN_SAMPLES_SPLIT = 2
@@ -33,10 +33,9 @@ CRITERION = 'entropy'
 N_JOBS = -1
 WARM_START = True
 OOB_SCORE = True
-CV_FOLDS = 5
+TEST_SIZE = 0.2
 SHOW_FEATURE_IMPORTANCE = True
 TOP_N_FEATURES = 50
-TEST_SIZE = 0.2
 
 def load_data(file_path):
     print(f"Loading data from {file_path}...")
@@ -51,7 +50,21 @@ def preprocess_data(df, target_column):
         features.extend(['p1_rating', 'p2_rating'])
 
     if USE_CURRENT_POKEMON:
-        features.extend(['p1_pokemon', 'p2_pokemon'])
+        features.extend(['p1_current_pokemon'])
+
+    if USE_PREVIOUS_POKEMON:
+        features.extend([
+            'p1_first_previous_pokemon', 'p1_second_previous_pokemon',
+            'p1_third_previous_pokemon', 'p1_fourth_previous_pokemon', 'p1_fifth_previous_pokemon',
+            'p2_first_previous_pokemon', 'p2_second_previous_pokemon',
+            'p2_third_previous_pokemon', 'p2_fourth_previous_pokemon', 'p2_fifth_previous_pokemon'
+        ])
+
+    if USE_POKEMON_COUNT:
+        features.extend(['p1_number_of_pokemon_revealed', 'p2_number_of_pokemon_revealed'])
+
+    if USE_FAINTED_POKEMON:
+        features.extend(['p1_fainted_pokemon', 'p2_fainted_pokemon'])
 
     if USE_MOVES:
         features.extend(['p1_move', 'p2_move'])
@@ -61,9 +74,6 @@ def preprocess_data(df, target_column):
 
     if USE_STATUS_INFO:
         features.extend(['p1_status', 'p2_status'])
-
-    if USE_OPPONENT_REVEALED:
-        features.extend(['p1_revealed_pokemon'])
 
     if USE_TURN_INFO:
         features.extend(['turn_id'])
@@ -77,8 +87,11 @@ def preprocess_data(df, target_column):
         if feature in processed_df.columns:
             if (processed_df[feature].dtype == 'object' or
                     feature in [
-                        'p1_pokemon', 'p2_pokemon', 'p1_move', 'p2_move',
-                        'p1_status', 'p2_status', 'p1_revealed_pokemon'
+                        'p1_current_pokemon', 'p1_first_previous_pokemon', 'p1_second_previous_pokemon',
+                        'p1_third_previous_pokemon', 'p1_fourth_previous_pokemon', 'p1_fifth_previous_pokemon',
+                        'p2_first_previous_pokemon', 'p2_second_previous_pokemon', 'p2_third_previous_pokemon',
+                        'p2_fourth_previous_pokemon', 'p2_fifth_previous_pokemon', 'p1_move', 'p2_move',
+                        'p1_status', 'p2_status', 'p1_fainted_pokemon', 'p2_fainted_pokemon'
                     ]):
                 categorical_features.append(feature)
             else:
@@ -163,7 +176,6 @@ def train_model_with_tracking(X, y, categorical_features, numerical_features, fe
     print("Splitting data into train and test sets...")
 
     class_counts = y.value_counts()
-
     rare_classes = class_counts[class_counts < 2].index
     if len(rare_classes) > 0:
         print(f"Removing {len(rare_classes)} rare Pokemon classes with only 1 occurrence")
@@ -176,7 +188,6 @@ def train_model_with_tracking(X, y, categorical_features, numerical_features, fe
         X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y
     )
 
-
     print(f"Training data shape: {X_train.shape}")
     print(f"Testing data shape: {X_test.shape}")
 
@@ -188,8 +199,8 @@ def train_model_with_tracking(X, y, categorical_features, numerical_features, fe
     X_test_cat = encoder.transform(X_test, categorical_features)
 
     print("Extracting numerical features...")
-    X_train_num = X_train[numerical_features].values
-    X_test_num = X_test[numerical_features].values
+    X_train_num = X_train[numerical_features].values if numerical_features else np.zeros((X_train.shape[0], 0))
+    X_test_num = X_test[numerical_features].values if numerical_features else np.zeros((X_test.shape[0], 0))
 
     print("Combining features...")
     X_train_combined = np.hstack([X_train_cat, X_train_num])
@@ -305,7 +316,6 @@ def show_interpretable_feature_importance(model_info):
 def evaluate_model(model_info):
     print("\nModel Evaluation:")
     model = model_info['model']
-    X_test_combined = model_info['X_test_combined']
     y_test = model_info['y_test']
     y_pred = model_info['y_pred']
 
@@ -354,19 +364,19 @@ def evaluate_model(model_info):
         'Predicted': y_pred
     })
 
-    for col in ['p1_pokemon', 'p2_pokemon', 'p1_revealed_pokemon', 'turn_id']:
+    for col in ['p1_current_pokemon', 'p1_number_of_pokemon_revealed', 'p2_number_of_pokemon_revealed', 'turn_id']:
         if col in X_test_reset.columns:
             error_df[col] = X_test_reset[col]
 
     error_df['Correct'] = (error_df['Actual'] == error_df['Predicted']).astype(int)
 
-    by_pokemon = error_df.groupby('p2_pokemon').agg({
+    by_pokemon = error_df.groupby('p1_current_pokemon').agg({
         'Correct': 'mean',
         'Actual': 'count'
     }).rename(columns={'Correct': 'Accuracy', 'Actual': 'Count'})
     by_pokemon = by_pokemon.sort_values('Count', ascending=False).head(10)
 
-    print("\nAccuracy by Current Opponent Pokemon (top 10 by frequency):")
+    print("\nAccuracy by Current Player Pokemon (top 10 by frequency):")
     print(by_pokemon)
 
     if 'turn_id' in error_df.columns:
@@ -400,6 +410,15 @@ def evaluate_model(model_info):
         print("\nAccuracy by Game Stage:")
         print(by_turn)
 
+    if 'p2_number_of_pokemon_revealed' in error_df.columns:
+        by_revealed = error_df.groupby('p2_number_of_pokemon_revealed').agg({
+            'Correct': 'mean',
+            'Actual': 'count'
+        }).rename(columns={'Correct': 'Accuracy', 'Actual': 'Count'})
+
+        print("\nAccuracy by Number of Opponent Pokemon Revealed:")
+        print(by_revealed)
+
 def get_prediction_probabilities(model_info, sample_data, top_n=5):
     model = model_info['model']
     encoder = model_info['encoder']
@@ -407,7 +426,7 @@ def get_prediction_probabilities(model_info, sample_data, top_n=5):
     numerical_features = model_info['numerical_features']
 
     sample_cat = encoder.transform(sample_data, categorical_features)
-    sample_num = sample_data[numerical_features].values
+    sample_num = sample_data[numerical_features].values if numerical_features else np.zeros((sample_data.shape[0], 0))
     sample_combined = np.hstack([sample_cat, sample_num])
 
     proba = model.predict_proba(sample_combined)[0]
@@ -418,7 +437,7 @@ def get_prediction_probabilities(model_info, sample_data, top_n=5):
 
     return top_classes, top_probas
 
-def save_model_package(model_info, filename="pokemon_prediction_model_package.joblib"):
+def save_model_package(model_info, filename="pokemon_prediction_model_fixed.joblib"):
     print(f"\nSaving model package to '{filename}'...")
 
     model_package = {
@@ -450,7 +469,7 @@ def main():
     for col in sample_data.columns:
         print(f"  {col}: {sample_data[col].values[0]}")
 
-    print(f"Actual next Pokémon: {actual_pokemon}")
+    print(f"Actual opponent Pokémon: {actual_pokemon}")
     print(f"Top 5 predictions:")
     for i, (pokemon, prob) in enumerate(zip(top_predictions, top_probabilities)):
         print(f"  {i+1}. {pokemon}: {prob:.4f} probability")
