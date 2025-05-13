@@ -10,7 +10,7 @@ import time
 import warnings
 warnings.filterwarnings('ignore')
 
-FILE_PATH = "../Parquets/all_pokemon_showdown_replays.parquet"
+FILE_PATH = "Parquets/all_pokemon_showdown_replays.parquet"
 TARGET_COLUMN = 'p2_current_pokemon'
 USE_RATING_FEATURES = True
 USE_CURRENT_POKEMON = True
