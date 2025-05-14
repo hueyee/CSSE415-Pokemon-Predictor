@@ -92,6 +92,13 @@ class GameData:
                 new_pokemon: PokemonDict = {'name': turn['p1_current_pokemon'], 'moves': []}
                 currentRevealedInfo['p1_pokemon'].append(new_pokemon)
                 currentRevealedInfo['p1_current_pokemon'] = new_pokemon['name']
+            else:
+                # check if new pokemon was swapped out
+                if currentRevealedInfo['p1_current_pokemon'] != turn['p1_current_pokemon']:
+                    # currentPokemon =
+                    pass
+
+                pass
 
             # Player 2 updates
             if len(currentRevealedInfo['p2_pokemon']) < turn['p2_number_of_pokemon_revealed']:
@@ -103,10 +110,29 @@ class GameData:
             self.revealProgress.append(currentRevealedInfo.copy())
 
     def finalizeData(self):
-        pass
+        for revealData in self.revealProgress:
+
+            for pokemon in revealData['p1_pokemon']:
+                for i in range(4 - len(pokemon['moves'])):
+                    pokemon['moves'].append('')
+
+            for i in range(6 - len(revealData['p1_pokemon'])):
+                empty_pokemon: PokemonDict = {'name': '', 'moves': ['', '', '', '']}
+                revealData['p1_pokemon'].append(empty_pokemon)
+
+            for pokemon in revealData['p2_pokemon']:
+                for i in range(4 - len(pokemon['moves'])):
+                    pokemon['moves'].append('')
+
+            for i in range(6 - len(revealData['p2_pokemon'])):
+                empty_pokemon: PokemonDict = {'name': '', 'moves': ['', '', '', '']}
+                revealData['p2_pokemon'].append(empty_pokemon)
+            pass
 
     def createDataFrame(self) -> pd.DataFrame:
-        players = ['p1, p2']
+        self.finalizeData()
+
+        players = ['p1', 'p2']
         pokemonLabels = ['pokemon1', 'pokemon2', 'pokemon3', 'pokemon4', 'pokemon5', 'pokemon6']
         pokemonInfoLabels = ['name', 'move1', 'move2', 'move3', 'move4']
 
@@ -117,7 +143,7 @@ class GameData:
         columns = ['turn_id']
         for player in players:
             columns.append(f'{player}_rating')
-            columns.apped(f'{player}_current_pokemon')
+            columns.append(f'{player}_current_pokemon')
 
             for pokemon in pokemonLabels:
 
@@ -141,6 +167,9 @@ class GameData:
                 dataEntry.append(move2)
                 dataEntry.append(move3)
                 dataEntry.append(move4)
+
+            dataEntry.append(p2_rating)
+            dataEntry.append(revealData['p2_current_pokemon'])
 
             for i in range(6):
                 name = revealData['p2_pokemon'][i]['name']
@@ -171,8 +200,15 @@ def main():
 
     for gameId in gameIds:
         turns = df[df['game_id'] == gameId]
-        gameData = GameData(turns)
-        gameData.createDataFrame()
+        games.append(GameData(turns))
+
+    data = []
+    for game in games:
+        data.append(game.createDataFrame())
+
+    df = pd.concat(data, axis=0)
+
+    df.to_csv('test.csv', index=False)
 
 
 if __name__ == "__main__":
