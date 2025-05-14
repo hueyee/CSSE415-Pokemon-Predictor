@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+# Takes in one parquet that has all the data and breaks it out
+
 PARQUET_FOLDER = "Parquets/"
 FILE_PATH = PARQUET_FOLDER + "all_pokemon_showdown_replays.parquet"
 

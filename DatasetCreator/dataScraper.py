@@ -41,7 +41,7 @@ def download_replay(replay_id, player1, player2, stats):
         )
         sanitized_player1 = sanitize_filename(player1)
         sanitized_player2 = sanitize_filename(player2)
-        filename = f"Replays/{replay_id}-{sanitized_player1}-{sanitized_player2}.html"
+        filename = f"../Replays/{replay_id}-{sanitized_player1}-{sanitized_player2}.html"
         
         with open(filename, "w", encoding="utf-8") as file:
             file.write(log_content)
