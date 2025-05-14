@@ -3,6 +3,7 @@ import re
 from typing import List, TypedDict
 
 import pandas as pd
+import copy
 import numpy as np
 from bs4 import BeautifulSoup
 
@@ -81,7 +82,7 @@ class GameData:
         currentRevealedInfo['p1_pokemon'] = [p1_pokemon1]
         currentRevealedInfo['p2_pokemon'] = [p2_pokemon1]
 
-        self.revealProgress.append(currentRevealedInfo.copy())
+        self.revealProgress.append((copy.deepcopy(currentRevealedInfo)))
 
         # iterate through rest of turns
         for turn in self.turns[1:]:
@@ -93,12 +94,11 @@ class GameData:
                 currentRevealedInfo['p1_pokemon'].append(new_pokemon)
                 currentRevealedInfo['p1_current_pokemon'] = new_pokemon['name']
             else:
-                # check if new pokemon was swapped out
-                if currentRevealedInfo['p1_current_pokemon'] != turn['p1_current_pokemon']:
-                    # currentPokemon =
-                    pass
-
-                pass
+                currentRevealedInfo['p1_current_pokemon'] = turn['p1_current_pokemon']
+                for pokemon in currentRevealedInfo['p1_pokemon']:
+                    if pokemon['name'] == currentRevealedInfo['p1_current_pokemon']:
+                        if turn['p1_move'] not in pokemon['moves']:
+                            pokemon['moves'].append(turn['p1_move'])
 
             # Player 2 updates
             if len(currentRevealedInfo['p2_pokemon']) < turn['p2_number_of_pokemon_revealed']:
@@ -106,26 +106,33 @@ class GameData:
                 new_pokemon: PokemonDict = {'name': turn['p2_current_pokemon'], 'moves': []}
                 currentRevealedInfo['p2_pokemon'].append(new_pokemon)
                 currentRevealedInfo['p2_current_pokemon'] = new_pokemon['name']
+            else:
+                currentRevealedInfo['p2_current_pokemon'] = turn['p2_current_pokemon']
+                for pokemon in currentRevealedInfo['p2_pokemon']:
+                    if pokemon['name'] == currentRevealedInfo['p2_current_pokemon']:
+                        if turn['p2_move'] not in pokemon['moves']:
+                            pokemon['moves'].append(turn['p2_move'])
 
-            self.revealProgress.append(currentRevealedInfo.copy())
+            currentRevealedInfo['turn_id'] = turn['turn_id']
+            self.revealProgress.append(copy.deepcopy(currentRevealedInfo))
 
     def finalizeData(self):
         for revealData in self.revealProgress:
 
             for pokemon in revealData['p1_pokemon']:
                 for i in range(4 - len(pokemon['moves'])):
-                    pokemon['moves'].append('')
+                    pokemon['moves'].append(None)
 
             for i in range(6 - len(revealData['p1_pokemon'])):
-                empty_pokemon: PokemonDict = {'name': '', 'moves': ['', '', '', '']}
+                empty_pokemon: PokemonDict = {'name': None, 'moves': [None, None, None, None]}
                 revealData['p1_pokemon'].append(empty_pokemon)
 
             for pokemon in revealData['p2_pokemon']:
                 for i in range(4 - len(pokemon['moves'])):
-                    pokemon['moves'].append('')
+                    pokemon['moves'].append(None)
 
             for i in range(6 - len(revealData['p2_pokemon'])):
-                empty_pokemon: PokemonDict = {'name': '', 'moves': ['', '', '', '']}
+                empty_pokemon: PokemonDict = {'name': None, 'moves': [None, None, None, None]}
                 revealData['p2_pokemon'].append(empty_pokemon)
             pass
 
@@ -196,19 +203,26 @@ def main():
 
     gameIds = df['game_id'].unique()
 
-    games: List[GameData] = []
+    turns = df[df['game_id'] == gameIds[0]]
 
-    for gameId in gameIds:
-        turns = df[df['game_id'] == gameId]
-        games.append(GameData(turns))
+    gameData = GameData(turns)
 
-    data = []
-    for game in games:
-        data.append(game.createDataFrame())
+    new_df = gameData.createDataFrame()
+    new_df.to_csv('test.csv', index=False)
 
-    df = pd.concat(data, axis=0)
-
-    df.to_csv('test.csv', index=False)
+    # games: List[GameData] = []
+    #
+    # for gameId in gameIds:
+    #     turns = df[df['game_id'] == gameId]
+    #     games.append(GameData(turns))
+    #
+    # data = []
+    # for game in games:
+    #     data.append(game.createDataFrame())
+    #
+    # df = pd.concat(data, axis=0)
+    #
+    # df.to_csv('test.csv', index=False)
 
 
 if __name__ == "__main__":
