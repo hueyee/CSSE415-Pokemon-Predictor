@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 # Given a parquet where each entry is a turn, create a new dataset that focuses on what information gets revealed
 
 INPUT_PARQUET = "../Parquets/all_pokemon_showdown_replays.parquet"
+OUTPUT_CSV = "../Parquets/all_pokemon_moves.csv"
 
 TurnDict = TypedDict('TurnDict', {
     'game_id': str,
@@ -51,6 +52,8 @@ DataRevealDict = TypedDict('DataRevealDict', {
     'p2_current_pokemon': str,
     'p1_pokemon': List[PokemonDict],
     'p2_pokemon': List[PokemonDict],
+    'p1_number_of_pokemon_revealed': int,
+    'p2_number_of_pokemon_revealed': int,
 })
 
 
@@ -71,7 +74,8 @@ class GameData:
 
     def processTurns(self):
         # initialize current revealed info from turn 0
-        currentRevealedInfo: DataRevealDict = {'turn_id': 0}
+        currentRevealedInfo: DataRevealDict = {'turn_id': 0, 'p1_number_of_pokemon_revealed': 1,
+                                               'p2_number_of_pokemon_revealed': 1}
 
         p1_pokemon1: PokemonDict = {'name': self.turns[0]['p1_current_pokemon'], 'moves': []}
         p2_pokemon1: PokemonDict = {'name': self.turns[0]['p2_current_pokemon'], 'moves': []}
@@ -93,6 +97,7 @@ class GameData:
                 new_pokemon: PokemonDict = {'name': turn['p1_current_pokemon'], 'moves': []}
                 currentRevealedInfo['p1_pokemon'].append(new_pokemon)
                 currentRevealedInfo['p1_current_pokemon'] = new_pokemon['name']
+                currentRevealedInfo['p1_number_of_pokemon_revealed'] += 1
             else:
                 currentRevealedInfo['p1_current_pokemon'] = turn['p1_current_pokemon']
                 for pokemon in currentRevealedInfo['p1_pokemon']:
@@ -106,6 +111,7 @@ class GameData:
                 new_pokemon: PokemonDict = {'name': turn['p2_current_pokemon'], 'moves': []}
                 currentRevealedInfo['p2_pokemon'].append(new_pokemon)
                 currentRevealedInfo['p2_current_pokemon'] = new_pokemon['name']
+                currentRevealedInfo['p2_number_of_pokemon_revealed'] += 1
             else:
                 currentRevealedInfo['p2_current_pokemon'] = turn['p2_current_pokemon']
                 for pokemon in currentRevealedInfo['p2_pokemon']:
@@ -151,6 +157,7 @@ class GameData:
         for player in players:
             columns.append(f'{player}_rating')
             columns.append(f'{player}_current_pokemon')
+            columns.append(f'{player}_number_of_pokemon_revealed')
 
             for pokemon in pokemonLabels:
 
@@ -160,7 +167,8 @@ class GameData:
         data = []
         # arrange data
         for revealData in self.revealProgress:
-            dataEntry = [revealData['turn_id'], p1_rating, revealData['p1_current_pokemon']]
+            dataEntry = [revealData['turn_id'], p1_rating, revealData['p1_current_pokemon'],
+                         revealData['p1_number_of_pokemon_revealed']]
 
             for i in range(6):
                 name = revealData['p1_pokemon'][i]['name']
@@ -177,6 +185,7 @@ class GameData:
 
             dataEntry.append(p2_rating)
             dataEntry.append(revealData['p2_current_pokemon'])
+            dataEntry.append(revealData['p2_number_of_pokemon_revealed'])
 
             for i in range(6):
                 name = revealData['p2_pokemon'][i]['name']
@@ -205,24 +214,19 @@ def main():
 
     turns = df[df['game_id'] == gameIds[0]]
 
-    gameData = GameData(turns)
+    games: List[GameData] = []
 
-    new_df = gameData.createDataFrame()
-    new_df.to_csv('test.csv', index=False)
+    for gameId in gameIds:
+        turns = df[df['game_id'] == gameId]
+        games.append(GameData(turns))
 
-    # games: List[GameData] = []
-    #
-    # for gameId in gameIds:
-    #     turns = df[df['game_id'] == gameId]
-    #     games.append(GameData(turns))
-    #
-    # data = []
-    # for game in games:
-    #     data.append(game.createDataFrame())
-    #
-    # df = pd.concat(data, axis=0)
-    #
-    # df.to_csv('test.csv', index=False)
+    data = []
+    for game in games:
+        data.append(game.createDataFrame())
+
+    new_df = pd.concat(data, axis=0)
+
+    new_df.to_csv(OUTPUT_CSV, index=False)
 
 
 if __name__ == "__main__":
