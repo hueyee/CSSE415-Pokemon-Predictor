@@ -259,23 +259,20 @@ def evaluate_model(model_info, pokemon_idx):
     print("\nClassification Report (top 15 classes):")
     print(classification_report(y_test, y_pred, labels=top_classes, zero_division=0))
 
-    top20_classes = y_test.value_counts().head(100).index.tolist()
-    print("\nConfusion Matrix (top 20 classes):")
+    all_classes = sorted(list(set(y_test.unique()).union(set(y_pred))))
+    print(f"\nConfusion Matrix (all {len(all_classes)} classes):")
     cm = confusion_matrix(
         y_test, y_pred,
-        labels=top20_classes
+        labels=all_classes
     )
-    cm_df = pd.DataFrame(cm, index=top20_classes, columns=top20_classes)
-    print(cm_df)
+    cm_df = pd.DataFrame(cm, index=all_classes, columns=all_classes)
 
     try:
-        plt.figure(figsize=(10, 8))
-        sns.heatmap(cm_df, annot=True, fmt='d', cmap='Blues')
+        plt.figure(figsize=(2560/300, 1440/300), dpi=300)
+        sns.heatmap(cm_df, annot=False, fmt='d', cmap='RdBu_r', xticklabels=False, yticklabels=False)
         plt.title(f'Confusion Matrix - Pokemon {pokemon_idx}')
-        plt.ylabel('True Label')
-        plt.xlabel('Predicted Label')
         plt.tight_layout()
-        plt.savefig(f'confusion_matrix_pokemon_{pokemon_idx}.png')
+        plt.savefig(f'confusion_matrix_pokemon_{pokemon_idx}.png', dpi=300)
         plt.close()
         print(f"\nConfusion matrix plot saved as 'confusion_matrix_pokemon_{pokemon_idx}.png'")
     except Exception as e:
