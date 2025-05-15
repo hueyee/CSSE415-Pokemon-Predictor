@@ -43,6 +43,7 @@ TurnDict = TypedDict('TurnDict', {
 
 PokemonDict = TypedDict('PokemonDict', {
     'name': str,
+    'moves_revealed': int,
     'moves': List[str],
 })
 
@@ -77,8 +78,8 @@ class GameData:
         currentRevealedInfo: DataRevealDict = {'turn_id': 0, 'p1_number_of_pokemon_revealed': 1,
                                                'p2_number_of_pokemon_revealed': 1}
 
-        p1_pokemon1: PokemonDict = {'name': self.turns[0]['p1_current_pokemon'], 'moves': []}
-        p2_pokemon1: PokemonDict = {'name': self.turns[0]['p2_current_pokemon'], 'moves': []}
+        p1_pokemon1: PokemonDict = {'name': self.turns[0]['p1_current_pokemon'], 'moves_revealed': 0, 'moves': []}
+        p2_pokemon1: PokemonDict = {'name': self.turns[0]['p2_current_pokemon'], 'moves_revealed': 0, 'moves': []}
 
         currentRevealedInfo['p1_current_pokemon'] = p1_pokemon1['name']
         currentRevealedInfo['p2_current_pokemon'] = p2_pokemon1['name']
@@ -94,30 +95,36 @@ class GameData:
             # Player 1 updates
             if len(currentRevealedInfo['p1_pokemon']) < turn['p1_number_of_pokemon_revealed']:
                 # Assuming this is a new pokemon
-                new_pokemon: PokemonDict = {'name': turn['p1_current_pokemon'], 'moves': []}
+                new_pokemon: PokemonDict = {'name': turn['p1_current_pokemon'], 'moves_revealed': 0, 'moves': []}
                 currentRevealedInfo['p1_pokemon'].append(new_pokemon)
                 currentRevealedInfo['p1_current_pokemon'] = new_pokemon['name']
                 currentRevealedInfo['p1_number_of_pokemon_revealed'] += 1
             else:
                 currentRevealedInfo['p1_current_pokemon'] = turn['p1_current_pokemon']
+                if turn['p1_move'] is None:
+                    continue
                 for pokemon in currentRevealedInfo['p1_pokemon']:
                     if pokemon['name'] == currentRevealedInfo['p1_current_pokemon']:
                         if turn['p1_move'] not in pokemon['moves']:
                             pokemon['moves'].append(turn['p1_move'])
+                            pokemon['moves_revealed'] += 1
 
             # Player 2 updates
             if len(currentRevealedInfo['p2_pokemon']) < turn['p2_number_of_pokemon_revealed']:
                 # Assuming this is a new pokemon
-                new_pokemon: PokemonDict = {'name': turn['p2_current_pokemon'], 'moves': []}
+                new_pokemon: PokemonDict = {'name': turn['p2_current_pokemon'], 'moves_revealed': 0, 'moves': []}
                 currentRevealedInfo['p2_pokemon'].append(new_pokemon)
                 currentRevealedInfo['p2_current_pokemon'] = new_pokemon['name']
                 currentRevealedInfo['p2_number_of_pokemon_revealed'] += 1
             else:
                 currentRevealedInfo['p2_current_pokemon'] = turn['p2_current_pokemon']
+                if turn['p2_move'] is None:
+                    continue
                 for pokemon in currentRevealedInfo['p2_pokemon']:
                     if pokemon['name'] == currentRevealedInfo['p2_current_pokemon']:
                         if turn['p2_move'] not in pokemon['moves']:
                             pokemon['moves'].append(turn['p2_move'])
+                            pokemon['moves_revealed'] += 1
 
             currentRevealedInfo['turn_id'] = turn['turn_id']
             self.revealProgress.append(copy.deepcopy(currentRevealedInfo))
@@ -126,19 +133,21 @@ class GameData:
         for revealData in self.revealProgress:
 
             for pokemon in revealData['p1_pokemon']:
+                # pokemon['moves_revealed'] = len(pokemon['moves'])
                 for i in range(4 - len(pokemon['moves'])):
                     pokemon['moves'].append(None)
 
             for i in range(6 - len(revealData['p1_pokemon'])):
-                empty_pokemon: PokemonDict = {'name': None, 'moves': [None, None, None, None]}
+                empty_pokemon: PokemonDict = {'name': None, 'moves_revealed': 0, 'moves': [None, None, None, None]}
                 revealData['p1_pokemon'].append(empty_pokemon)
 
             for pokemon in revealData['p2_pokemon']:
+                # pokemon['moves_revealed'] = len(pokemon['moves'])
                 for i in range(4 - len(pokemon['moves'])):
                     pokemon['moves'].append(None)
 
             for i in range(6 - len(revealData['p2_pokemon'])):
-                empty_pokemon: PokemonDict = {'name': None, 'moves': [None, None, None, None]}
+                empty_pokemon: PokemonDict = {'name': None, 'moves_revealed': 0, 'moves': [None, None, None, None]}
                 revealData['p2_pokemon'].append(empty_pokemon)
             pass
 
@@ -147,7 +156,7 @@ class GameData:
 
         players = ['p1', 'p2']
         pokemonLabels = ['pokemon1', 'pokemon2', 'pokemon3', 'pokemon4', 'pokemon5', 'pokemon6']
-        pokemonInfoLabels = ['name', 'move1', 'move2', 'move3', 'move4']
+        pokemonInfoLabels = ['name', 'moves_revealed', 'move1', 'move2', 'move3', 'move4']
 
         p1_rating = self.turns[0]['p1_rating']
         p2_rating = self.turns[0]['p2_rating']
@@ -167,17 +176,20 @@ class GameData:
         data = []
         # arrange data
         for revealData in self.revealProgress:
+            pass
             dataEntry = [revealData['turn_id'], p1_rating, revealData['p1_current_pokemon'],
                          revealData['p1_number_of_pokemon_revealed']]
 
             for i in range(6):
                 name = revealData['p1_pokemon'][i]['name']
+                moves_revealed = revealData['p1_pokemon'][i]['moves_revealed']
                 move1 = revealData['p1_pokemon'][i]['moves'][0]
                 move2 = revealData['p1_pokemon'][i]['moves'][1]
                 move3 = revealData['p1_pokemon'][i]['moves'][2]
                 move4 = revealData['p1_pokemon'][i]['moves'][3]
 
                 dataEntry.append(name)
+                dataEntry.append(moves_revealed)
                 dataEntry.append(move1)
                 dataEntry.append(move2)
                 dataEntry.append(move3)
@@ -189,12 +201,14 @@ class GameData:
 
             for i in range(6):
                 name = revealData['p2_pokemon'][i]['name']
+                moves_revealed = revealData['p2_pokemon'][i]['moves_revealed']
                 move1 = revealData['p2_pokemon'][i]['moves'][0]
                 move2 = revealData['p2_pokemon'][i]['moves'][1]
                 move3 = revealData['p2_pokemon'][i]['moves'][2]
                 move4 = revealData['p2_pokemon'][i]['moves'][3]
 
                 dataEntry.append(name)
+                dataEntry.append(moves_revealed)
                 dataEntry.append(move1)
                 dataEntry.append(move2)
                 dataEntry.append(move3)
@@ -204,6 +218,11 @@ class GameData:
 
         df = pd.DataFrame(data=data, columns=columns)
 
+        # Go back through the data and create the "next_pokemon" column
+
+        for index in reversed(df.index):
+            pass
+
         return df
 
 
@@ -212,9 +231,12 @@ def main():
 
     gameIds = df['game_id'].unique()
 
-    turns = df[df['game_id'] == gameIds[0]]
-
     games: List[GameData] = []
+
+    # # Testing
+    # turns = df[df['game_id'] == gameIds[1]]
+    # game = GameData(turns)
+    # game.createDataFrame().to_csv("test.csv")
 
     for gameId in gameIds:
         turns = df[df['game_id'] == gameId]
