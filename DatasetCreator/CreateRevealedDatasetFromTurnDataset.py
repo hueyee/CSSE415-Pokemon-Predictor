@@ -73,6 +73,9 @@ class GameData:
 
         self.processTurns()
 
+    def isFullGame(self) -> bool:
+        return self.revealProgress[-1]['p2_number_of_pokemon_revealed'] == 6
+
     def processTurns(self):
         # initialize current revealed info from turn 0
         currentRevealedInfo: DataRevealDict = {'turn_id': 0, 'p1_number_of_pokemon_revealed': 1,
@@ -219,9 +222,15 @@ class GameData:
         df = pd.DataFrame(data=data, columns=columns)
 
         # Go back through the data and create the "next_pokemon" column
+        # NOTE: we only want to use games where all 6 pokemon got revealed
 
-        for index in reversed(df.index):
-            pass
+        df['next_pokemon'] = None
+
+        for i in range(5):
+            # df[df['p2_number_of_pokemon_revealed'] == i+1]['next_pokemon'] = \
+            #     df[df['p2_number_of_pokemon_revealed'] == i+2].iloc[0]['p2_current_pokemon']
+            df.loc[df['p2_number_of_pokemon_revealed'] == i+1, 'next_pokemon'] = \
+                df[df['p2_number_of_pokemon_revealed'] == i+2].iloc[0]['p2_current_pokemon']
 
         return df
 
@@ -240,7 +249,9 @@ def main():
 
     for gameId in gameIds:
         turns = df[df['game_id'] == gameId]
-        games.append(GameData(turns))
+        game = GameData(turns)
+        if game.isFullGame():
+            games.append(game)
 
     data = []
     for game in games:
