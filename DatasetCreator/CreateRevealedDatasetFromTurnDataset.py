@@ -76,6 +76,9 @@ class GameData:
     def isFullGame(self) -> bool:
         return self.revealProgress[-1]['p2_number_of_pokemon_revealed'] == 6
 
+    def getTotalP2PokemonRevealed(self) -> int:
+        return self.revealProgress[-1]['p2_number_of_pokemon_revealed']
+
     def processTurns(self):
         # initialize current revealed info from turn 0
         currentRevealedInfo: DataRevealDict = {'turn_id': 0, 'p1_number_of_pokemon_revealed': 1,
@@ -155,6 +158,8 @@ class GameData:
             pass
 
     def createDataFrame(self) -> pd.DataFrame:
+        numberP2Pokemon = self.getTotalP2PokemonRevealed()
+
         self.finalizeData()
 
         players = ['p1', 'p2']
@@ -179,6 +184,9 @@ class GameData:
         data = []
         # arrange data
         for revealData in self.revealProgress:
+            # if revealData['p2_number_of_pokemon_revealed'] >= numberP2Pokemon:
+            #     break  # there are no more pokemon to predict so break
+
             pass
             dataEntry = [revealData['turn_id'], p1_rating, revealData['p1_current_pokemon'],
                          revealData['p1_number_of_pokemon_revealed']]
@@ -222,15 +230,22 @@ class GameData:
         df = pd.DataFrame(data=data, columns=columns)
 
         # Go back through the data and create the "next_pokemon" column
-        # NOTE: we only want to use games where all 6 pokemon got revealed
-
+        # NOTE: we only want to use turns where there is a next pokemon to reveal
         df['next_pokemon'] = None
+        try:
+            for i in range(df.iloc[-1]['p2_number_of_pokemon_revealed'] - 1):
+                # df[df['p2_number_of_pokemon_revealed'] == i+1]['next_pokemon'] = \
+                #     df[df['p2_number_of_pokemon_revealed'] == i+2].iloc[0]['p2_current_pokemon']
+                df.loc[df['p2_number_of_pokemon_revealed'] == i + 1, 'next_pokemon'] = \
+                    df[df['p2_number_of_pokemon_revealed'] == i + 2].iloc[0]['p2_current_pokemon']
+                pass
+        except:
+            # print("Error with getting next pokemon revealed")
+            pass
 
-        for i in range(5):
-            # df[df['p2_number_of_pokemon_revealed'] == i+1]['next_pokemon'] = \
-            #     df[df['p2_number_of_pokemon_revealed'] == i+2].iloc[0]['p2_current_pokemon']
-            df.loc[df['p2_number_of_pokemon_revealed'] == i+1, 'next_pokemon'] = \
-                df[df['p2_number_of_pokemon_revealed'] == i+2].iloc[0]['p2_current_pokemon']
+        # df = df[df['next_pokemon'] is not None]
+        # df = df.drop([])
+        df.dropna(subset=['next_pokemon'], inplace=True)
 
         return df
 
@@ -243,15 +258,15 @@ def main():
     games: List[GameData] = []
 
     # # Testing
-    # turns = df[df['game_id'] == gameIds[1]]
+    # turns = df[df['game_id'] == gameIds[0]]
     # game = GameData(turns)
     # game.createDataFrame().to_csv("test.csv")
 
     for gameId in gameIds:
         turns = df[df['game_id'] == gameId]
         game = GameData(turns)
-        if game.isFullGame():
-            games.append(game)
+        # if game.isFullGame():
+        games.append(game)
 
     data = []
     for game in games:
