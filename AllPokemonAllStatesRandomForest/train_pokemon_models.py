@@ -69,10 +69,12 @@ def preprocess_data(df, pokemon_idx):
 
     if USE_MOVES:
         for i in range(1, 7):
+            features.append(f'p1_pokemon{i}_moves_revealed')
             for j in range(1, 5):
                 features.append(f'p1_pokemon{i}_move{j}')
 
         for i in range(1, pokemon_idx):
+            features.append(f'p2_pokemon{i}_moves_revealed')
             for j in range(1, 5):
                 features.append(f'p2_pokemon{i}_move{j}')
 
