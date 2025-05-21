@@ -20,7 +20,7 @@ FILE_PATH = "../Parquets/all_pokemon_moves.csv"
 MODELS_DIR = "../Models"
 CONFIDENCE_THRESHOLD = 0.1
 MAX_PROPAGATIONS = 4
-SAMPLE_SIZE = 1000
+SAMPLE_SIZE = 100
 
 class CustomOneHotEncoder:
     def __init__(self):
@@ -156,6 +156,7 @@ def propagate_predictions(row, models, start_idx=2):
     })
 
     current_node_id = 1
+    initial_turn_id = original_row.get('turn_id', 0)
 
     for position_idx in range(start_idx, 7):
         print(f"\nPredicting Pokemon at position {position_idx}...")
@@ -176,11 +177,23 @@ def propagate_predictions(row, models, start_idx=2):
             }
             results.append(result)
 
-            
             prediction_paths = []
             for pokemon, prob in candidate_predictions:
                 new_row = original_row.copy()
                 new_row[f'p2_pokemon{position_idx}_name'] = pokemon
+                new_row['p2_current_pokemon'] = pokemon  # Update current Pokemon
+                new_row['p2_number_of_pokemon_revealed'] = position_idx  # Update revealed count
+
+                # Update turn ID - assume each new Pokemon reveal takes 3 turns on average
+                new_row['turn_id'] = initial_turn_id + (position_idx - start_idx + 1) * 3
+
+                # Update previous Pokemon history - shift current to first previous
+                if new_row.get('p2_current_pokemon') != pokemon and new_row.get('p2_current_pokemon'):
+                    new_row['p2_first_previous_pokemon'] = new_row.get('p2_current_pokemon')
+                    new_row['p2_second_previous_pokemon'] = new_row.get('p2_first_previous_pokemon')
+                    new_row['p2_third_previous_pokemon'] = new_row.get('p2_second_previous_pokemon')
+                    new_row['p2_fourth_previous_pokemon'] = new_row.get('p2_third_previous_pokemon')
+                    new_row['p2_fifth_previous_pokemon'] = new_row.get('p2_fourth_previous_pokemon')
 
                 path = {
                     'pokemon': pokemon,
@@ -190,7 +203,6 @@ def propagate_predictions(row, models, start_idx=2):
                     'order': 0
                 }
 
-                
                 visualization_data['nodes'].append({
                     'id': current_node_id,
                     'label': f"{pokemon}\n{prob:.3f}",
@@ -201,14 +213,12 @@ def propagate_predictions(row, models, start_idx=2):
                     'probability': prob
                 })
 
-                
                 visualization_data['edges'].append({
                     'source': root_id,
                     'target': current_node_id,
                     'type': 'prediction'
                 })
 
-                
                 visualization_data['game_states'].append({
                     'node_id': current_node_id,
                     'state': new_row.copy(),
@@ -218,17 +228,14 @@ def propagate_predictions(row, models, start_idx=2):
                 prediction_paths.append(path)
                 current_node_id += 1
 
-            
             all_state_history[position_idx] = prediction_paths
 
         else:
-            
             previous_position = position_idx - 1
             previous_predictions = all_state_history[previous_position]
 
             current_predictions = []
 
-            
             for prev_path in previous_predictions:
                 previous_state = prev_path['state']
                 previous_pokemon = prev_path['pokemon']
@@ -236,7 +243,6 @@ def propagate_predictions(row, models, start_idx=2):
                 previous_node_id = prev_path['node_id']
                 previous_order = prev_path['order']
 
-                
                 new_predictions = predict_next_pokemon(previous_state, position_idx, models[position_idx])
                 top_new_predictions = sorted(new_predictions.items(), key=lambda x: x[1], reverse=True)
 
@@ -245,16 +251,25 @@ def propagate_predictions(row, models, start_idx=2):
                 if not candidate_new_predictions:
                     candidate_new_predictions = [top_new_predictions[0]]
 
-                
                 for pokemon, prob in candidate_new_predictions:
-                    
                     new_state = previous_state.copy()
                     new_state[f'p2_pokemon{position_idx}_name'] = pokemon
+                    new_state['p2_current_pokemon'] = pokemon  # Update current Pokemon
+                    new_state['p2_number_of_pokemon_revealed'] = position_idx  # Update revealed count
 
-                    
+                    # Update turn ID - assume each new Pokemon reveal takes 3 turns on average
+                    new_state['turn_id'] = previous_state.get('turn_id', initial_turn_id) + 3
+
+                    # Update previous Pokemon history - shift current to first previous
+                    if new_state.get('p2_current_pokemon') != pokemon and new_state.get('p2_current_pokemon'):
+                        new_state['p2_first_previous_pokemon'] = new_state.get('p2_current_pokemon')
+                        new_state['p2_second_previous_pokemon'] = new_state.get('p2_first_previous_pokemon')
+                        new_state['p2_third_previous_pokemon'] = new_state.get('p2_second_previous_pokemon')
+                        new_state['p2_fourth_previous_pokemon'] = new_state.get('p2_third_previous_pokemon')
+                        new_state['p2_fifth_previous_pokemon'] = new_state.get('p2_fourth_previous_pokemon')
+
                     weighted_prob = prob * previous_prob
 
-                    
                     new_path = {
                         'pokemon': pokemon,
                         'probability': weighted_prob,
@@ -266,7 +281,6 @@ def propagate_predictions(row, models, start_idx=2):
                         'order': previous_order + 1
                     }
 
-                    
                     visualization_data['nodes'].append({
                         'id': current_node_id,
                         'label': f"{pokemon}\n{prob:.3f}",
@@ -278,14 +292,12 @@ def propagate_predictions(row, models, start_idx=2):
                         'weighted_prob': weighted_prob
                     })
 
-                    
                     visualization_data['edges'].append({
                         'source': previous_node_id,
                         'target': current_node_id,
                         'type': 'prediction'
                     })
 
-                    
                     visualization_data['game_states'].append({
                         'node_id': current_node_id,
                         'state': new_state.copy(),
@@ -295,7 +307,6 @@ def propagate_predictions(row, models, start_idx=2):
                     current_predictions.append(new_path)
                     current_node_id += 1
 
-            
             weighted_predictions = defaultdict(float)
             total_parent_probability = defaultdict(float)
             pokemon_to_paths = defaultdict(list)
@@ -306,18 +317,14 @@ def propagate_predictions(row, models, start_idx=2):
                 total_parent_probability[pokemon] += path['parent_prob']
                 pokemon_to_paths[pokemon].append(path)
 
-            
             normalized_predictions = {}
             for pokemon, weighted_sum in weighted_predictions.items():
                 if total_parent_probability[pokemon] > 0:
                     normalized_predictions[pokemon] = weighted_sum / total_parent_probability[pokemon]
 
-            
             top_normalized = sorted(normalized_predictions.items(), key=lambda x: x[1], reverse=True)
 
-            
             for pokemon, avg_prob in top_normalized:
-                
                 avg_node_id = current_node_id
 
                 visualization_data['nodes'].append({
@@ -329,7 +336,6 @@ def propagate_predictions(row, models, start_idx=2):
                     'probability': avg_prob
                 })
 
-                
                 for path in pokemon_to_paths[pokemon]:
                     visualization_data['edges'].append({
                         'source': path['node_id'],
@@ -339,13 +345,11 @@ def propagate_predictions(row, models, start_idx=2):
 
                 current_node_id += 1
 
-            
             normalized_candidates = [(pokemon, prob) for pokemon, prob in top_normalized
                                      if prob >= CONFIDENCE_THRESHOLD]
             if not normalized_candidates:
                 normalized_candidates = [top_normalized[0]]
 
-            
             max_order = max(path['order'] for path in current_predictions) if current_predictions else 0
             result = {
                 'pokemon_idx': position_idx,
@@ -354,11 +358,8 @@ def propagate_predictions(row, models, start_idx=2):
             }
             results.append(result)
 
-            
             next_level_paths = []
             for pokemon, avg_prob in normalized_candidates:
-                
-                
                 best_path = max(pokemon_to_paths[pokemon], key=lambda p: p['probability'])
 
                 new_path = {
@@ -373,7 +374,6 @@ def propagate_predictions(row, models, start_idx=2):
 
                 next_level_paths.append(new_path)
 
-            
             all_state_history[position_idx] = next_level_paths
 
     return results, visualization_data
@@ -385,7 +385,6 @@ def create_prediction_visualization(visualization_data, output_path="prediction_
     node_sizes = []
     node_labels = {}
 
-    
     for node in visualization_data['nodes']:
         G.add_node(node['id'])
 
@@ -411,22 +410,18 @@ def create_prediction_visualization(visualization_data, output_path="prediction_
 
             node_sizes.append(1500 - node['order'] * 200)
 
-    
     for edge in visualization_data['edges']:
         if edge['type'] == 'prediction':
             G.add_edge(edge['source'], edge['target'], style='solid')
         else:
             G.add_edge(edge['source'], edge['target'], style='dashed')
 
-    
     pos = {}
 
-    
     nodes_by_level = defaultdict(list)
     for node in visualization_data['nodes']:
         nodes_by_level[node['level']].append(node['id'])
 
-    
     max_level = max(nodes_by_level.keys())
     y_step = 0.8 / (max_level + 1)
 
@@ -442,23 +437,18 @@ def create_prediction_visualization(visualization_data, output_path="prediction_
                 x_pos = 0.1 + i * x_step
                 pos[node_id] = (x_pos, y_pos)
 
-    
     plt.figure(figsize=(20, 16))
 
-    
     solid_edges = [(u, v) for u, v in G.edges() if G.get_edge_data(u, v).get('style') == 'solid']
     dashed_edges = [(u, v) for u, v in G.edges() if G.get_edge_data(u, v).get('style') == 'dashed']
 
     nx.draw_networkx_edges(G, pos, edgelist=solid_edges, width=1.0)
     nx.draw_networkx_edges(G, pos, edgelist=dashed_edges, width=1.0, style='dashed')
 
-    
     nx.draw_networkx_nodes(G, pos, node_size=node_sizes, node_color=node_colors, alpha=0.8)
 
-    
     nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=10)
 
-    
     legend_elements = [
         Patch(facecolor='lightblue', edgecolor='black', label='Start'),
         Patch(facecolor='lightgreen', edgecolor='black', label='Order 0 (Direct)'),
@@ -572,14 +562,11 @@ def visualize_results(results, all_predictions):
     plt.savefig('accuracy_by_pokemon_position.png')
     plt.close()
 
-    
     prediction_df = pd.DataFrame(all_predictions)
 
-    
     starting_positions = prediction_df.groupby(['starting_position', 'pokemon_idx'])['correct'].agg(['mean', 'count']).reset_index()
     starting_positions.columns = ['starting_position', 'pokemon_idx', 'accuracy', 'count']
 
-    
     plt.figure(figsize=(14, 8))
     pivot_table = starting_positions.pivot_table(
         index='starting_position',
@@ -596,7 +583,6 @@ def visualize_results(results, all_predictions):
     plt.savefig('accuracy_by_starting_position.png')
     plt.close()
 
-    
     plt.figure(figsize=(14, 8))
     count_pivot = starting_positions.pivot_table(
         index='starting_position',
@@ -613,7 +599,6 @@ def visualize_results(results, all_predictions):
     plt.savefig('counts_by_starting_position.png')
     plt.close()
 
-    
     plt.figure(figsize=(14, 8))
     order_accuracy = prediction_df.groupby(['pokemon_idx', 'propagation_order'])['correct'].mean().reset_index()
     order_accuracy = order_accuracy.pivot(index='propagation_order', columns='pokemon_idx', values='correct')
@@ -626,7 +611,6 @@ def visualize_results(results, all_predictions):
     plt.savefig('accuracy_by_propagation_order.png')
     plt.close()
 
-    
     plt.figure(figsize=(10, 6))
     confidence_bins = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
     prediction_df['confidence_bin'] = pd.cut(prediction_df['confidence'], bins=confidence_bins)
@@ -647,7 +631,6 @@ def visualize_results(results, all_predictions):
     plt.savefig('accuracy_by_confidence.png')
     plt.close()
 
-    
     print("\nOverall Accuracy:", results['overall']['accuracy'])
 
     print("\nAccuracy by Pokemon Position:")
@@ -683,24 +666,20 @@ def main():
     if SAMPLE_SIZE is not None:
         print(f"Sampling {SAMPLE_SIZE} rows from {len(df)} total rows")
 
-        
         strat_col = 'p2_number_of_pokemon_revealed'
 
-        
         counts_by_strata = df.groupby(strat_col).size()
         print(f"Distribution of revealed Pokemon in dataset:")
         for count, num_rows in counts_by_strata.items():
             print(f"  {count} Pokemon revealed: {num_rows} rows")
 
-        
         samples_per_stratum = {}
-        total_weight = sum([(i+1)**2 for i in range(6)])  
+        total_weight = sum([(i+1)**2 for i in range(6)])
 
         for i in range(6):
             weight = (i+1)**2 / total_weight
-            samples_per_stratum[i] = max(int(SAMPLE_SIZE * weight), 50)  
+            samples_per_stratum[i] = max(int(SAMPLE_SIZE * weight), 50)
 
-        
         if sum(samples_per_stratum.values()) > SAMPLE_SIZE:
             scale = SAMPLE_SIZE / sum(samples_per_stratum.values())
             samples_per_stratum = {k: max(int(v * scale), 10) for k, v in samples_per_stratum.items()}
@@ -709,7 +688,6 @@ def main():
         for strata, sample_count in samples_per_stratum.items():
             print(f"  {strata} Pokemon revealed: {sample_count} samples")
 
-        
         sampled_dfs = []
         for strata_value, sample_count in samples_per_stratum.items():
             strata_df = df[df[strat_col] == strata_value]
@@ -726,7 +704,6 @@ def main():
     print("Loading models...")
     models = load_latest_models()
 
-    
     for revealed_count in range(0, 5):
         mask = df['p2_number_of_pokemon_revealed'] == revealed_count
         example_rows = df[mask]

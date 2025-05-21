@@ -20,9 +20,10 @@ USE_RATING_FEATURES = True
 USE_CURRENT_POKEMON = True
 USE_PREVIOUS_POKEMON = True
 USE_POKEMON_COUNT = True
-USE_MOVES = True
+USE_MOVES = False  # Set to false because the propagation mechanism cant predict this
 USE_TURN_INFO = True
-N_ESTIMATORS = 1000
+USE_PLAYER_1 = False  # Set to false because the propagation mechanism cant predict this
+N_ESTIMATORS = 50
 MAX_DEPTH = 50
 MIN_SAMPLES_SPLIT = 2
 MIN_SAMPLES_LEAF = 1
@@ -49,37 +50,43 @@ def preprocess_data(df, pokemon_idx):
     target_column = f"next_pokemon"
 
     features = []
+
     if USE_RATING_FEATURES:
-        features.extend(['p1_rating', 'p2_rating'])
+        features.append('p2_rating')
+        features.append('p1_rating')
 
     if USE_CURRENT_POKEMON:
-        features.extend(['p1_current_pokemon', 'p2_current_pokemon'])
+        features.append('p2_current_pokemon')
+        if USE_PLAYER_1:
+            features.append('p1_current_pokemon')
 
     if USE_PREVIOUS_POKEMON:
-        features.extend([
-            'p1_pokemon1_name', 'p1_pokemon2_name', 'p1_pokemon3_name', 'p1_pokemon4_name', 'p1_pokemon5_name',
-            'p1_pokemon6_name',
-        ])
+        if USE_PLAYER_1:
+            features.extend([
+                'p1_pokemon1_name', 'p1_pokemon2_name', 'p1_pokemon3_name', 'p1_pokemon4_name', 'p1_pokemon5_name',
+                'p1_pokemon6_name',
+            ])
 
         for i in range(1, pokemon_idx):
             features.append(f'p2_pokemon{i}_name')
 
     if USE_POKEMON_COUNT:
-        features.extend(['p1_number_of_pokemon_revealed', 'p2_number_of_pokemon_revealed'])
+        features.append('p2_number_of_pokemon_revealed')
+        if USE_PLAYER_1:
+            features.append('p1_number_of_pokemon_revealed')
 
     if USE_MOVES:
-        for i in range(1, 7):
-            features.append(f'p1_pokemon{i}_moves_revealed')
-            for j in range(1, 5):
-                features.append(f'p1_pokemon{i}_move{j}')
+        if USE_PLAYER_1:
+            for i in range(1, 7):
+                for j in range(1, 5):
+                    features.append(f'p1_pokemon{i}_move{j}')
 
         for i in range(1, pokemon_idx):
-            features.append(f'p2_pokemon{i}_moves_revealed')
             for j in range(1, 5):
                 features.append(f'p2_pokemon{i}_move{j}')
 
     if USE_TURN_INFO:
-        features.extend(['turn_id'])
+        features.append('turn_id')
 
     mask = processed_df['p2_number_of_pokemon_revealed'] >= pokemon_idx - 1
     processed_df = processed_df[mask]

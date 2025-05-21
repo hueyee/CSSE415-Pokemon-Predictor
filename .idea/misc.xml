@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.10 (CSSE415-Pokemon-Predictor)" project-jdk-type="Python SDK" />
+  <component name="Black">
+    <option name="sdkName" value="Python 3.12 (CSSE415-Pokemon-Predictor)" />
+  </component>
+  <component name="ProjectRootManager" version="2" default="true" project-jdk-name="Python 3.12 (CSSE415-Pokemon-Predictor)" project-jdk-type="Python SDK">
+    <output url="file://$PROJECT_DIR$/out" />
+  </component>
 </project>
