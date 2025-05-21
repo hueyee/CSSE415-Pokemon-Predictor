@@ -20,7 +20,7 @@ FILE_PATH = "../Parquets/all_pokemon_moves.csv"
 MODELS_DIR = "../Models"
 CONFIDENCE_THRESHOLD = 0.1
 MAX_PROPAGATIONS = 4
-SAMPLE_SIZE = 100
+SAMPLE_SIZE = 1000
 
 class CustomOneHotEncoder:
     def __init__(self):
@@ -763,7 +763,7 @@ def main():
     models = load_latest_models()
 
 
-    final_state = debug_prediction_process(models)
+    debug_prediction_process(models)
 
     for revealed_count in range(0, 5):
         mask = df['p2_number_of_pokemon_revealed'] == revealed_count

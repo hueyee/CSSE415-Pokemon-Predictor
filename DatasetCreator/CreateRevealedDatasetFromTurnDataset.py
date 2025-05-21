@@ -48,6 +48,7 @@ PokemonDict = TypedDict('PokemonDict', {
 })
 
 DataRevealDict = TypedDict('DataRevealDict', {
+    'game_id': str,  # Added game_id to DataRevealDict
     'turn_id': int,
     'p1_current_pokemon': str,
     'p2_current_pokemon': str,
@@ -61,12 +62,16 @@ DataRevealDict = TypedDict('DataRevealDict', {
 class GameData:
 
     def __init__(self, data: pd.DataFrame):
-
+        self.game_id = None  # Initialize game_id
         self.turns: List[TurnDict] = []
 
         for index, turnData in data.iterrows():
             turn: TurnDict = turnData.to_dict()
             self.turns.append(turn)
+
+            # Extract game_id from the first turn (should be the same for all turns in this game)
+            if self.game_id is None and 'game_id' in turn:
+                self.game_id = turn['game_id']
 
         # This stores entries of how data gets revealed as the game progresses
         self.revealProgress: List[DataRevealDict] = []
@@ -81,8 +86,12 @@ class GameData:
 
     def processTurns(self):
         # initialize current revealed info from turn 0
-        currentRevealedInfo: DataRevealDict = {'turn_id': 0, 'p1_number_of_pokemon_revealed': 1,
-                                               'p2_number_of_pokemon_revealed': 1}
+        currentRevealedInfo: DataRevealDict = {
+            'game_id': self.game_id,  # Include game_id in initial state
+            'turn_id': 0,
+            'p1_number_of_pokemon_revealed': 1,
+            'p2_number_of_pokemon_revealed': 1
+        }
 
         p1_pokemon1: PokemonDict = {'name': self.turns[0]['p1_current_pokemon'], 'moves_revealed': 0, 'moves': []}
         p2_pokemon1: PokemonDict = {'name': self.turns[0]['p2_current_pokemon'], 'moves_revealed': 0, 'moves': []}
@@ -169,8 +178,8 @@ class GameData:
         p1_rating = self.turns[0]['p1_rating']
         p2_rating = self.turns[0]['p2_rating']
 
-        # create the columns
-        columns = ['turn_id']
+        # create the columns - add game_id as the first column
+        columns = ['game_id', 'turn_id']
         for player in players:
             columns.append(f'{player}_rating')
             columns.append(f'{player}_current_pokemon')
@@ -188,7 +197,8 @@ class GameData:
             #     break  # there are no more pokemon to predict so break
 
             pass
-            dataEntry = [revealData['turn_id'], p1_rating, revealData['p1_current_pokemon'],
+            # Include game_id as the first element
+            dataEntry = [revealData['game_id'], revealData['turn_id'], p1_rating, revealData['p1_current_pokemon'],
                          revealData['p1_number_of_pokemon_revealed']]
 
             for i in range(6):
@@ -233,48 +243,72 @@ class GameData:
         # NOTE: we only want to use turns where there is a next pokemon to reveal
         df['next_pokemon'] = None
         try:
-            for i in range(df.iloc[-1]['p2_number_of_pokemon_revealed'] - 1):
-                # df[df['p2_number_of_pokemon_revealed'] == i+1]['next_pokemon'] = \
-                #     df[df['p2_number_of_pokemon_revealed'] == i+2].iloc[0]['p2_current_pokemon']
-                df.loc[df['p2_number_of_pokemon_revealed'] == i + 1, 'next_pokemon'] = \
-                    df[df['p2_number_of_pokemon_revealed'] == i + 2].iloc[0]['p2_current_pokemon']
-                pass
-        except:
-            # print("Error with getting next pokemon revealed")
-            pass
+            # Group by game_id first to ensure we're looking at the correct game sequence
+            for game_id, game_group in df.groupby('game_id'):
+                for i in range(game_group.iloc[-1]['p2_number_of_pokemon_revealed'] - 1):
+                    # Get the first Pokémon that appears when p2_number_of_pokemon_revealed == i+2
+                    next_pokemon = game_group[game_group['p2_number_of_pokemon_revealed'] == i + 2].iloc[0]['p2_current_pokemon'] if not game_group[game_group['p2_number_of_pokemon_revealed'] == i + 2].empty else None
 
-        # df = df[df['next_pokemon'] is not None]
-        # df = df.drop([])
+                    # Set next_pokemon for all rows in this game where p2_number_of_pokemon_revealed == i+1
+                    row_indices = df[(df['game_id'] == game_id) & (df['p2_number_of_pokemon_revealed'] == i + 1)].index
+                    df.loc[row_indices, 'next_pokemon'] = next_pokemon
+        except Exception as e:
+            print(f"Error generating next_pokemon column: {e}")
+            # Continue processing even if there's an error
+
+        # Drop rows where next_pokemon is None
         df.dropna(subset=['next_pokemon'], inplace=True)
 
         return df
 
 
 def main():
+    print(f"Loading data from {INPUT_PARQUET}...")
     df = pd.read_parquet(INPUT_PARQUET)
 
     gameIds = df['game_id'].unique()
+    print(f"Found {len(gameIds)} unique games")
 
     games: List[GameData] = []
 
-    # # Testing
-    # turns = df[df['game_id'] == gameIds[0]]
-    # game = GameData(turns)
-    # game.createDataFrame().to_csv("test.csv")
-
+    # Process each game
     for gameId in gameIds:
         turns = df[df['game_id'] == gameId]
         game = GameData(turns)
-        # if game.isFullGame():
-        games.append(game)
+        # Only add games with at least one P2 Pokémon revealed
+        if game.getTotalP2PokemonRevealed() >= 1:
+            games.append(game)
 
-    data = []
+        # Debug log to show progress
+        if len(games) % 50 == 0:
+            print(f"Processed {len(games)} games so far...")
+
+    print(f"Processed {len(games)} valid games")
+    print("Creating final dataset...")
+
+    data_frames = []
     for game in games:
-        data.append(game.createDataFrame())
+        try:
+            game_df = game.createDataFrame()
+            data_frames.append(game_df)
+        except Exception as e:
+            print(f"Error processing game {game.game_id}: {e}")
+            continue
 
-    new_df = pd.concat(data, axis=0)
+    if data_frames:
+        new_df = pd.concat(data_frames, axis=0)
 
-    new_df.to_csv(OUTPUT_CSV, index=False)
+        # Verify game_id is in the output
+        if 'game_id' not in new_df.columns:
+            print("WARNING: game_id column is missing from the final DataFrame!")
+        else:
+            print(f"Successfully included game_id column with {new_df['game_id'].nunique()} unique values")
+
+        print(f"Saving {len(new_df)} rows to {OUTPUT_CSV}")
+        new_df.to_csv(OUTPUT_CSV, index=False)
+        print(f"Data saved to {OUTPUT_CSV}")
+    else:
+        print("No valid data frames to concatenate!")
 
 
 if __name__ == "__main__":

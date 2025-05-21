@@ -62,7 +62,7 @@ def display_progress_bar(percentage, bar_length=30):
 
 def main():
     format = "gen3ou"
-    pages_to_fetch = 80
+    pages_to_fetch = 160
     start_time = time.time()
     
     replays = fetch_replays(format=format, pages=pages_to_fetch)
