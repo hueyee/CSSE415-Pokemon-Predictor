@@ -20,10 +20,10 @@ USE_RATING_FEATURES = True
 USE_CURRENT_POKEMON = True
 USE_PREVIOUS_POKEMON = True
 USE_POKEMON_COUNT = True
-USE_MOVES = False  # Set to false because the propagation mechanism cant predict this
+USE_MOVES = False
 USE_TURN_INFO = True
-USE_PLAYER_1 = False  # Set to false because the propagation mechanism cant predict this
-N_ESTIMATORS = 200
+USE_PLAYER_1 = False
+N_ESTIMATORS = 400
 MAX_DEPTH = 50
 MIN_SAMPLES_SPLIT = 2
 MIN_SAMPLES_LEAF = 1
@@ -36,12 +36,49 @@ N_JOBS = -1
 WARM_START = True
 OOB_SCORE = True
 TEST_SIZE = 0.2
+VALIDATION_SIZE = 0.2
 SHOW_FEATURE_IMPORTANCE = True
 TOP_N_FEATURES = 20
 
 def load_data(file_path):
     print(f"Loading data from {file_path}...")
     return pd.read_csv(file_path)
+
+def split_data_with_validation(df):
+    print("Creating train/test/validation split...")
+
+    class_counts = df['next_pokemon'].value_counts()
+    rare_classes = class_counts[class_counts < 3].index
+
+    if len(rare_classes) > 0:
+        print(f"Removing {len(rare_classes)} rare Pokemon classes with fewer than 3 occurrences before splitting")
+        df = df[~df['next_pokemon'].isin(rare_classes)]
+        print(f"Data shape after removing rare classes: {df.shape}")
+
+    train_df, temp_df = train_test_split(
+        df, test_size=(TEST_SIZE + VALIDATION_SIZE), random_state=RANDOM_STATE, stratify=df['next_pokemon']
+    )
+
+    temp_class_counts = temp_df['next_pokemon'].value_counts()
+    temp_rare_classes = temp_class_counts[temp_class_counts < 2].index
+
+    if len(temp_rare_classes) > 0:
+        print(f"Removing {len(temp_rare_classes)} additional rare classes from temp split")
+        temp_df = temp_df[~temp_df['next_pokemon'].isin(temp_rare_classes)]
+
+    test_size_adjusted = TEST_SIZE / (TEST_SIZE + VALIDATION_SIZE)
+    test_df, validation_df = train_test_split(
+        temp_df, test_size=(1 - test_size_adjusted), random_state=RANDOM_STATE, stratify=temp_df['next_pokemon']
+    )
+
+    print(f"Train set size: {len(train_df)} ({len(train_df)/len(df)*100:.1f}%)")
+    print(f"Test set size: {len(test_df)} ({len(test_df)/len(df)*100:.1f}%)")
+    print(f"Validation set size: {len(validation_df)} ({len(validation_df)/len(df)*100:.1f}%)")
+
+    validation_df.to_csv("../Parquets/validation_pokemon_moves.csv", index=False)
+    print("Validation set saved to ../Parquets/validation_pokemon_moves.csv")
+
+    return pd.concat([train_df, test_df])
 
 def preprocess_data(df, pokemon_idx):
     print(f"Preprocessing data for Pokemon {pokemon_idx}...")
@@ -363,6 +400,7 @@ def main():
     print(f"Models will be saved to: {output_dir}")
 
     df = load_data(FILE_PATH)
+    df = split_data_with_validation(df)
 
     for pokemon_idx in range(2, 7):
         print(f"\n{'='*80}")
