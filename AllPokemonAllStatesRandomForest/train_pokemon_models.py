@@ -12,7 +12,7 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 
-FILE_PATH = "../Parquets/all_pokemon_moves.csv"
+FILE_PATH = "../Parquets/all_pokemon_sequences.csv"
 MODELS_DIR = "../Models"
 TARGET_PREFIX = "p2_pokemon"
 TARGET_SUFFIX = "_name"
