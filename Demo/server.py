@@ -7,6 +7,7 @@ import numpy as np
 from bs4 import BeautifulSoup
 import re
 from Predict import predict_team
+from flask_cors import CORS
 
 REVEAL_LIMIT = 1  # Set how many revealed Pokémon to include per team
 IGNORE_LEAD = True  # If True, exclude the first revealed Pokémon (the lead)
@@ -542,6 +543,7 @@ class CustomOneHotEncoder:
 # When you run your script directly, __name__ is set to "__main__".
 # Flask uses this to know where to look for templates, static files, etc.
 app = Flask(__name__)
+CORS(app)
 
 # Define a route that processes raw text from the request body
 # This route expects a POST request to '/process-text'.
@@ -604,6 +606,14 @@ def process_text():
         message="Text processed successfully",
         received_text=team,
         text_length=len(str(team))
+    )
+
+@app.route('/sample', methods=['GET'])
+def sample_response():
+    return jsonify(
+        message="Text processed successfully",
+        received_text=["Blissey", "Skarmory", "Tyranitar", "Gengar", "Swampert", "Jirachi"],
+        text_length=len(str(["Blissey", "Skarmory", "Tyranitar", "Gengar", "Swampert", "Jirachi"]))
     )
 
 # This block ensures that the Flask development server runs only
