@@ -6,8 +6,8 @@ from collections import defaultdict
 import tqdm
 
 # Configuration settings
-INPUT_CSV = "../Parquets/all_pokemon_moves.csv"
-OUTPUT_CSV = "../Parquets/all_pokemon_sequences.csv"
+INPUT_CSV = "../../../data/processed/Parquets/all_pokemon_moves.csv"
+OUTPUT_CSV = "../../../data/processed/Parquets/all_pokemon_sequences.csv"
 MAX_REVEALS = 6  # Maximum number of Pokemon a player can have
 
 def extract_pokemon_reveal_sequences(df: pd.DataFrame) -> Dict[str, List[str]]:

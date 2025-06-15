@@ -4,8 +4,8 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from utils.game_parser import extract_battle_log_from_html, parse_replay_data, extract_features, refine_features, generate_parquet_rows
 
-REPLAY_DIR = "../Replays"
-OUTPUT_PARQUET = "../Parquets/all_pokemon_showdown_replays.parquet"
+REPLAY_DIR = "../../../data/raw/Replays"
+OUTPUT_PARQUET = "../../../data/processed/Parquets/all_pokemon_showdown_replays.parquet"
 TURN_LIMIT = -1  # -1 = all turns, >0 = fixed number of turns
 
 

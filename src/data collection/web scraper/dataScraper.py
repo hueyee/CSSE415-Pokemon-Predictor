@@ -5,7 +5,7 @@ import time
 from datetime import timedelta
 
 # Ensure the /Replays folder exists
-os.makedirs("../Replays", exist_ok=True)
+os.makedirs("../../../data/raw/Replays", exist_ok=True)
 
 def fetch_replays(format="gen3ou", pages=1):
     """Fetch replays from the Pokémon Showdown API."""

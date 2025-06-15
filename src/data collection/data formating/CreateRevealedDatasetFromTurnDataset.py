@@ -9,8 +9,8 @@ from bs4 import BeautifulSoup
 
 # Given a parquet where each entry is a turn, create a new dataset that focuses on what information gets revealed
 
-INPUT_PARQUET = "../Parquets/all_pokemon_showdown_replays.parquet"
-OUTPUT_CSV = "../Parquets/all_pokemon_moves.csv"
+INPUT_PARQUET = "../../../data/processed/Parquets/all_pokemon_showdown_replays.parquet"
+OUTPUT_CSV = "../../../data/processed/Parquets/all_pokemon_moves.csv"
 
 TurnDict = TypedDict('TurnDict', {
     'game_id': str,
