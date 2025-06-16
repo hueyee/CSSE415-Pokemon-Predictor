@@ -6,8 +6,8 @@ import numpy as np
 from bs4 import BeautifulSoup
 import re
 from prediction.predict import predict_team
-from utils.one_hot_encoder import CustomOneHotEncoder
-from utils.game_parser import parse_replay_data, extract_features, refine_features, generate_parquet_rows
+from one_hot_encoder import CustomOneHotEncoder
+from game_parser import parse_replay_data, extract_features, refine_features, generate_parquet_rows
 from flask_cors import CORS
 
 REVEAL_LIMIT = 1  # Set how many revealed Pokémon to include per team
