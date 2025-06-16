@@ -179,15 +179,15 @@ def refine_features(features):
 
     return refined_features
 
-def generate_parquet_rows(game_id, refined):
+def generate_parquet_rows(game_id, refined, turn_limit = -1):
     rows = []
     p1_rating = refined["player_ratings"].get("p1")
     p2_rating = refined["player_ratings"].get("p2")
 
-    if TURN_LIMIT == -1:
+    if turn_limit == -1:
         num_turns = len(refined["turns"])
     else:
-        num_turns = min(TURN_LIMIT, len(refined["turns"]))
+        num_turns = min(turn_limit, len(refined["turns"]))
 
     for turn_id, turn in enumerate(refined["turns"][:num_turns]):
         p1_pokemon = turn["active_pokemon"]["p1"]
