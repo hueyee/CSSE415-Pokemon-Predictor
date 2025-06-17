@@ -16,8 +16,8 @@ from matplotlib.patches import Patch
 logging.getLogger('joblib').setLevel(logging.ERROR)
 warnings.filterwarnings('ignore')
 
-FILE_PATH = "../Parquets/all_pokemon_moves.csv"
-MODELS_DIR = "../Models"
+FILE_PATH = "./data/processed/Parquets/all_pokemon_moves.csv"
+MODELS_DIR = "./data/models/Models"
 CONFIDENCE_THRESHOLD = 0.1
 MAX_PROPAGATIONS = 4
 SAMPLE_SIZE = 1000

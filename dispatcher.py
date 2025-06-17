@@ -10,7 +10,9 @@ def main():
     output_dir = os.path.join(MODELS_DIR, timestamp)
     os.makedirs(output_dir, exist_ok=True)
 
-    for pokemon_idx in range(2, 7):
+
+
+    for pokemon_idx in range(2, 7):  # 2 to 6 inclusive
         train_model_for_pokemon_idx.delay(FILE_PATH, pokemon_idx, output_dir)
 
 if __name__ == "__main__":

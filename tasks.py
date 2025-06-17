@@ -18,3 +18,4 @@ def train_model_for_pokemon_idx(file_path, pokemon_idx, output_dir):
     model_info = train_model(X, y, cat_feats, num_feats, pokemon_idx)
     evaluate_model(model_info, pokemon_idx)
     save_model_package(model_info, output_dir, pokemon_idx)
+
