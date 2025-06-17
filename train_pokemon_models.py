@@ -9,7 +9,6 @@ import joblib
 import time
 import datetime
 import os
-from tasks import train_by_game_id_batch, train_model_for_pokemon_idx
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -394,14 +393,24 @@ def save_model_package(model_info, output_dir, pokemon_idx):
     joblib.dump(model_package, model_filename)
     print(f"Model package saved to '{model_filename}'")
 
-
 def main():
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = os.path.join(MODELS_DIR, timestamp)
     os.makedirs(output_dir, exist_ok=True)
+    print(f"Models will be saved to: {output_dir}")
+
+    df = load_data(FILE_PATH)
+    df = split_data_with_validation(df)
 
     for pokemon_idx in range(2, 7):
-        train_model_for_pokemon_idx.delay(FILE_PATH, pokemon_idx, output_dir)
+        print(f"\n{'='*80}")
+        print(f"Processing Pokemon {pokemon_idx}")
+        print(f"{'='*80}\n")
+
+        X, y, categorical_features, numerical_features, processed_df = preprocess_data(df, pokemon_idx)
+        model_info = train_model(X, y, categorical_features, numerical_features, pokemon_idx)
+        evaluate_model(model_info, pokemon_idx)
+        save_model_package(model_info, output_dir, pokemon_idx)
 
 if __name__ == "__main__":
     main()
