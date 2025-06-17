@@ -2,8 +2,8 @@ import os
 import datetime
 from tasks import train_model_for_pokemon_idx
 
-FILE_PATH = "../data/processed/Parquets/all_pokemon_sequences.csv"
-MODELS_DIR = "../data/models/Models"
+FILE_PATH = "./data/processed/Parquets/all_pokemon_sequences.csv"
+MODELS_DIR = "./data/models/Models"
 
 def main():
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")

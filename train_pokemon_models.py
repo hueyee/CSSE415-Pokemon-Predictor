@@ -75,8 +75,8 @@ def split_data_with_validation(df):
     print(f"Test set size: {len(test_df)} ({len(test_df)/len(df)*100:.1f}%)")
     print(f"Validation set size: {len(validation_df)} ({len(validation_df)/len(df)*100:.1f}%)")
 
-    validation_df.to_csv("../Parquets/validation_pokemon_moves.csv", index=False)
-    print("Validation set saved to ../Parquets/validation_pokemon_moves.csv")
+    validation_df.to_csv("./data/processed/Parquets/validation_pokemon_moves.csv", index=False)
+    print("Validation set saved to ./data/processed/Parquets/validation_pokemon_moves.csv")
 
     return pd.concat([train_df, test_df])
 
