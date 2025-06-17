@@ -9,7 +9,7 @@ import joblib
 import time
 import datetime
 import os
-from tasks import train_by_game_id_batch
+from tasks import train_by_game_id_batch, train_model_for_pokemon_idx
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -394,22 +394,14 @@ def save_model_package(model_info, output_dir, pokemon_idx):
     joblib.dump(model_package, model_filename)
     print(f"Model package saved to '{model_filename}'")
 
-def chunk_list(lst, size):
-    for i in range(0, len(lst), size):
-        yield lst[i:i + size]
 
 def main():
-    df = pd.read_csv(FILE_PATH)
-    game_ids = df['game_id'].dropna().unique()
-    batch_size = 25  # Adjust depending on dataset and worker capacity
-
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = os.path.join(MODELS_DIR, timestamp)
     os.makedirs(output_dir, exist_ok=True)
 
     for pokemon_idx in range(2, 7):
-        for game_id_batch in chunk_list(game_ids, batch_size):
-            train_by_game_id_batch.delay(list(game_id_batch), FILE_PATH, pokemon_idx, output_dir)
+        train_model_for_pokemon_idx.delay(FILE_PATH, pokemon_idx, output_dir)
 
 if __name__ == "__main__":
     main()
